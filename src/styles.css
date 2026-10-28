@@ -133,3 +133,11 @@ label { display: block; color: #344054; font-size: 14px; font-weight: 600; }.log
 .top-actions { flex-wrap:wrap; }
 @media(max-width:700px){.topbar {height:auto!important; min-height:76px; padding-top:12px; padding-bottom:12px; gap:10px; flex-wrap:wrap;}.top-actions {width:100%; justify-content:flex-end;}.top-actions .user-block {display:none;}.create-menu {align-self:flex-end;}.hero-row .create-menu .primary-button {width:auto;} }
 .form-dialog label { color:#c9c0d8!important; }
+.check-option { display:flex; align-items:center; gap:10px; margin:18px 0; color:#c9c0d8; line-height:1.6; }
+.check-option input { flex:0 0 auto; width:18px; height:18px; margin:0; padding:0; accent-color:#9782f5; }
+.account-row > div { min-width:0; overflow-wrap:anywhere; }
+.account-row small { display:block; margin-top:6px; color:#a99fb9; overflow-wrap:anywhere; }
+.account-badges { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+.status-badge { display:inline-block; padding:5px 8px; border-radius:8px; background:#477d6a30; color:#9ddfc6; font-size:12px; }
+.status-badge.disabled { color:#ffb0c1; background:#bb385b25; }
+#password-logout { width:100%; margin-top:14px; }

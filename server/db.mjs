@@ -16,6 +16,8 @@ export async function migrate() {
  id integer primary key check (id=1), enabled boolean not null default false,
  content text not null default '', updated_at timestamptz not null default now());
  insert into login_banner704 (id) values(1) on conflict do nothing;`);
+ await db.query(`alter table accounts704 add column if not exists disabled boolean not null default false;
+ alter table accounts704 add column if not exists must_change_password boolean not null default false;`);
  await db.query("update announcements704 set audience='學生' where audience in ('全校學生','七年級','八年級','九年級')");
  await db.query(`create table if not exists site_marquee704 (
  id integer primary key check (id=1), enabled boolean not null default false,

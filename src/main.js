@@ -1,4 +1,4 @@
-import { cloud } from "./cloud.js?v=0.8.0";
+import { cloud } from "./cloud.js?v=0.9.0";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
@@ -132,6 +132,7 @@ function toast(message, tone = "success") {
 
 function render() {
   if (!state.session) return renderLogin();
+  if (state.session.must_change_password) return renderPasswordChange();
   if (state.settingsOpen) return renderSettings();
   if (state.adminView === "accounts" && ["admin","teacher"].includes(state.session.role)) return renderAccounts();
   if (state.editingId !== null) return renderEditor();
@@ -139,6 +140,13 @@ function render() {
   return renderDashboard();
 }
 
+window.addEventListener("session-expired",()=>{state.session=null;state.settingsOpen=false;state.adminView="dashboard";render();});
+window.addEventListener("password-required",()=>{if(state.session){state.session.must_change_password=true;render();}});
+function renderPasswordChange(){
+ app.innerHTML=`<main class="login-shell"><header class="login-masthead"><span class="portal-emblem">704</span><span>704公告系統</span></header><div class="login-center"><section class="login-panel"><div class="login-card"><h2>請更換密碼</h2><p class="muted">${escapeHtml(state.session.name)}，此帳號需要先更換密碼才能繼續使用。</p><form id="change-password-form"><label>目前密碼<input name="current_password" type="password" autocomplete="current-password"></label><label>新密碼<input name="new_password" type="password" autocomplete="new-password"></label><label>確認新密碼<input name="confirmation" type="password" autocomplete="new-password"></label><button class="primary-button wide">儲存新密碼</button></form><button class="secondary-button wide" id="password-logout">登出</button><p id="password-message" role="status"></p></div></section></div></main>`;
+ document.querySelector("#password-logout").addEventListener("click",()=>{cloud.logout();state.session=null;render();});
+ document.querySelector("#change-password-form").addEventListener("submit",async event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget)),button=event.currentTarget.querySelector("button"),message=document.querySelector("#password-message");if(data.new_password!==data.confirmation){message.textContent="兩次輸入的新密碼不相同";return;}button.disabled=true;try{const profile=await cloud.changePassword(data);state.session={...profile,name:profile.display_name};state.settingsOpen=false;state.adminView="dashboard";state.editingId=null;state.selectedId=null;state.announcements=[];state.countdowns=[];try{state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();}catch(error){toast(error.message,"error");}render();toast("密碼已更新");}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
+}
 function renderLogin() {
   const portal = portals[activeRole];
   document.title = portal.title + "｜704公告系統";
@@ -172,13 +180,12 @@ function renderLogin() {
     try {
       const profile = await cloud.login(data.get("account"), data.get("password"), activeRole);
       if (profile.role !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
-      state.announcements = await cloud.list();
-      state.countdowns = await cloud.countdowns();
       state.session = { ...profile, name: profile.display_name };
+      if(!profile.must_change_password){state.announcements = await cloud.list();state.countdowns = await cloud.countdowns();}
       state.selectedId = null;
       state.editingId = null;
       render();
-    } catch (error) { cloud.logout(); toast(error.message, "error"); }
+    } catch (error) { state.session=null; cloud.logout(); toast(error.message, "error"); }
     finally { button.disabled = false; }
   });
 }
@@ -223,29 +230,64 @@ function renderMaintenance() {
 }
 
 function renderAccounts() {
-  const isAdmin=state.session.role==="admin";
-  app.innerHTML = `${headerTemplate()}<main class="editor-shell">
-    <button class="back-button" id="accounts-back">${icon("back",18)} 返回管理首頁</button>
-    <div class="editor-heading"><span class="eyebrow dark">ACCOUNT ADMINISTRATION</span><h1>${isAdmin?"帳號管理":"學生帳號"}</h1><p>${isAdmin?"建立學生、教師與管理員帳號。":"建立學生帳號，提供學生登入使用。"}登入帳號可使用一般名稱，不限定電子郵件格式。</p></div>
-    <button class="primary-button" id="create-person">${isAdmin?"建立人員":"建立學生"}</button><dialog id="person-dialog" class="form-dialog"><button class="back-button" id="close-person" type="button">關閉</button><form class="editor-card" id="account-form"><h2>新增帳號</h2><div class="form-grid">
-      <label>登入帳號<input name="email" required placeholder="請輸入登入帳號"></label>
-      <label>顯示姓名<input name="name" placeholder="未填寫時使用登入帳號"></label>
-      ${isAdmin?'<label>角色<select name="role"><option value="student">學生</option><option value="teacher">教師</option><option value="admin">管理員</option></select></label>':'<input type="hidden" name="role" value="student"><p>角色：學生</p>'}
-      <label>初始密碼<input name="password" type="password" autocomplete="new-password"></label>
-    </div><footer class="editor-footer"><span>請將登入資料交給帳號本人。</span><button class="primary-button">建立帳號</button></footer></form></dialog>
-    <section class="editor-card"><h2>現有帳號</h2><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section>
-  </main>`;
-  bindHeader();
-  document.querySelector("#accounts-back").addEventListener("click", goHome);
-  const personDialog=document.querySelector("#person-dialog");
-  document.querySelector("#create-person").addEventListener("click",()=>personDialog.showModal());
-  document.querySelector("#close-person").addEventListener("click",()=>personDialog.close());
-  const message=document.querySelector("#accounts-message"), list=document.querySelector("#accounts-list");
-  const refresh=async()=>{ try { state.accounts=await cloud.accounts(); list.innerHTML=state.accounts.map(account=>`<div class="account-row" data-account="${account.id}"><strong>${escapeHtml(account.display_name)}</strong><span>${escapeHtml(account.email)}</span>${isAdmin?`<select aria-label="${escapeHtml(account.display_name)}角色"><option value="student" ${account.role==="student"?"selected":""}>學生</option><option value="teacher" ${account.role==="teacher"?"selected":""}>教師</option><option value="admin" ${account.role==="admin"?"selected":""}>管理員</option></select><button class="danger-button" data-remove-account="${account.id}">刪除</button>`:'<span class="role-chip">學生</span>'}</div>`).join("")||"<p>尚無帳號。</p>"; message.textContent=""; } catch(error){message.textContent=error.message;} };
-  document.querySelector("#account-form").addEventListener("submit",async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector(".primary-button");const data=Object.fromEntries(new FormData(form));button.disabled=true;try{await cloud.createAccount(data);form.reset();personDialog.close();toast("帳號已建立");await refresh();}catch(error){toast(error.message,"error");}finally{button.disabled=false;}});
-  list.addEventListener("change",async event=>{if(!event.target.matches("select"))return;const row=event.target.closest("[data-account]");const account=state.accounts.find(item=>item.id===row.dataset.account);try{await cloud.updateAccount(account.id,{name:account.display_name,role:event.target.value});toast("角色已更新");await refresh();}catch(error){toast(error.message,"error");await refresh();}});
-  list.addEventListener("click",async event=>{const button=event.target.closest("[data-remove-account]");if(!button)return;const account=state.accounts.find(item=>item.id===button.dataset.removeAccount);if(!window.confirm(`確定刪除帳號「${account.display_name}」？`))return;try{await cloud.deleteAccount(account.id);toast("帳號已刪除");await refresh();}catch(error){toast(error.message,"error");}});
-  refresh();
+ const isAdmin=state.session.role==="admin";
+ app.innerHTML=`${headerTemplate()}<main class="editor-shell">
+ <button class="back-button" id="accounts-back">${icon("back",18)} 返回首頁</button>
+ <div class="editor-heading"><span class="eyebrow dark">ACCOUNT ADMINISTRATION</span><h1>${isAdmin?"帳號管理":"學生帳號"}</h1><p>${isAdmin?"管理所有角色的人員帳號。":"建立及編輯學生帳號。"}點「編輯」可修改帳號資料、登入選項或重設密碼。</p></div>
+ <button class="primary-button" id="create-person">${isAdmin?"建立人員":"建立學生"}</button>
+ <dialog id="person-dialog" class="form-dialog"><button class="back-button" id="close-person" type="button">關閉</button>
+ <form class="editor-card" id="account-form"><h2 id="person-form-title">新增帳號</h2><input name="id" type="hidden"><div class="form-grid">
+ <label>登入帳號<input name="email" required placeholder="請輸入登入帳號"></label>
+ <label>顯示姓名<input name="name" placeholder="未填寫時使用登入帳號"></label>
+ ${isAdmin?'<label>角色<select name="role"><option value="student">學生</option><option value="teacher">教師</option><option value="admin">管理員</option></select></label>':'<input type="hidden" name="role" value="student"><p>角色：學生</p>'}
+ <label><span id="person-password-label">初始密碼</span><input name="password" type="password" autocomplete="new-password"></label>
+ </div>
+ <label class="check-option" id="reset-password-option" hidden><input name="reset_password" type="checkbox">重設密碼（未勾選時保留原密碼）</label>
+ <label class="check-option"><input name="must_change_password" type="checkbox">登入時要求更換密碼</label>
+ <label class="check-option"><input name="disabled" type="checkbox">停用帳戶</label>
+ <footer class="editor-footer"><span>編輯後，該帳號需重新登入。</span><button class="primary-button" id="save-person">建立帳號</button></footer>
+ </form></dialog>
+ <section class="editor-card"><h2>現有帳號</h2><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section></main>`;
+ bindHeader();
+ document.querySelector("#accounts-back").addEventListener("click",goHome);
+ const dialog=document.querySelector("#person-dialog"),form=document.querySelector("#account-form"),message=document.querySelector("#accounts-message"),list=document.querySelector("#accounts-list");
+ const open=account=>{
+ form.reset();form.elements.id.value=account?.id||"";
+ form.elements.email.value=account?.email||"";form.elements.name.value=account?.display_name||"";form.elements.role.value=account?.role||"student";
+ form.elements.disabled.checked=Boolean(account?.disabled);form.elements.must_change_password.checked=Boolean(account?.must_change_password);
+ form.elements.password.disabled=Boolean(account);
+ document.querySelector("#reset-password-option").hidden=!account;
+ document.querySelector("#person-form-title").textContent=account?"編輯帳號":"新增帳號";
+ document.querySelector("#person-password-label").textContent=account?"新密碼（勾選重設密碼後填寫）":"初始密碼";
+ document.querySelector("#save-person").textContent=account?"儲存變更":"建立帳號";dialog.showModal();
+ };
+ document.querySelector("#create-person").addEventListener("click",()=>open(null));
+ document.querySelector("#close-person").addEventListener("click",()=>dialog.close());
+ form.elements.reset_password.addEventListener("change",()=>{form.elements.password.disabled=!form.elements.reset_password.checked;});
+ const refresh=async()=>{
+ try{
+ state.accounts=await cloud.accounts();
+ list.innerHTML=state.accounts.map(account=>`<div class="account-row"><div><strong>${escapeHtml(account.display_name)}</strong><small>${escapeHtml(account.email)}</small></div><div class="account-badges"><span class="role-chip">${portals[account.role].label}</span><span class="status-badge ${account.disabled?"disabled":""}">${account.disabled?"已停用":"啟用中"}</span>${account.must_change_password?'<span class="status-badge">需更換密碼</span>':""}</div><button class="secondary-button" data-edit-account="${account.id}">編輯</button>${isAdmin?`<button class="danger-button" data-remove-account="${account.id}">刪除</button>`:""}</div>`).join("")||"<p>尚無帳號。</p>";message.textContent="";
+ }catch(error){message.textContent=error.message;}
+ };
+ form.addEventListener("submit",async event=>{
+ event.preventDefault();const button=document.querySelector("#save-person"),data=Object.fromEntries(new FormData(form)),id=data.id;delete data.id;
+ data.disabled=form.elements.disabled.checked;data.must_change_password=form.elements.must_change_password.checked;
+ data.reset_password=form.elements.reset_password.checked;button.disabled=true;
+ try{
+ const result=id?await cloud.updateAccount(id,data):await cloud.createAccount(data);
+ dialog.close();
+ if(result.reauthenticate){cloud.logout();state.session=null;render();toast("帳號已更新，請重新登入");return;}
+ toast(id?"帳號已更新":"帳號已建立");await refresh();
+ }catch(error){toast(error.message,"error");}finally{button.disabled=false;}
+ });
+ list.addEventListener("click",async event=>{
+ const edit=event.target.closest("[data-edit-account]");if(edit){open(state.accounts.find(account=>account.id===edit.dataset.editAccount));return;}
+ const button=event.target.closest("[data-remove-account]");if(!button)return;
+ const account=state.accounts.find(item=>item.id===button.dataset.removeAccount);
+ if(!window.confirm(`確定刪除帳號「${account.display_name}」？`))return;
+ try{await cloud.deleteAccount(account.id);toast("帳號已刪除");await refresh();}catch(error){toast(error.message,"error");}
+ });refresh();
 }
 
 function goHome(){state.selectedId=null;state.editingId=null;state.settingsOpen=false;state.adminView="dashboard";render();}

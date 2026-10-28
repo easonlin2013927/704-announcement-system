@@ -12,7 +12,11 @@ async function request(path, options = {}) {
     });
   } catch { throw new Error("無法連接公告服務，請確認網路或聯絡管理員。"); }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || "雲端操作失敗，請稍後重試。");
+  if (!response.ok) {
+    if(response.status===401&&token){token=null;window.dispatchEvent(new Event("session-expired"));}
+    if(data.code==="PASSWORD_CHANGE_REQUIRED")window.dispatchEvent(new Event("password-required"));
+    throw Object.assign(new Error(data.message || "雲端操作失敗，請稍後重試。"),{code:data.code});
+  }
   return data;
 }
 export const cloud = {
@@ -26,6 +30,7 @@ export const cloud = {
     if (token) request("/logout", { method: "POST" }).catch(() => {});
     token = null;
   },
+  async changePassword(value){const result=await request("/account/password",{method:"POST",body:JSON.stringify(value)});token=result.token;return result.profile;},
   async list() {
     const rows = await request("/announcements");
     return rows.map(row => ({ ...row, authorInitial: row.author.charAt(0) }));

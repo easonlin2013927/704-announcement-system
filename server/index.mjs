@@ -11,7 +11,7 @@ async function body(req) {
  let data = ""; for await (const chunk of req) { data += chunk; if (Buffer.byteLength(data) > 262144) throw Object.assign(new Error("內容過長"),{status:413}); }
  try { return JSON.parse(data); } catch { throw Object.assign(new Error("JSON 格式錯誤"),{status:400}); }
 }
-function fail(status, message) { throw Object.assign(new Error(message),{status}); }
+function fail(status, message, code) { throw Object.assign(new Error(message),{status,code}); }
 await migrate();
 const server = createServer(async (req,res) => {
  const send = (code,data) => { res.writeHead(code,{"Content-Type":"application/json; charset=utf-8"});res.end(JSON.stringify(data)); };
@@ -45,15 +45,37 @@ const server = createServer(async (req,res) => {
  fail(401,"帳號或密碼錯誤");
  }
  attempts.delete(email);
+ if(account.disabled) fail(403,"帳戶已停用，請聯絡教師或管理員");
  if (!["teacher","student","admin"].includes(data.portal) || data.portal !== account.role) fail(403,"帳號不屬於此登入入口");
  const token = randomBytes(32).toString("hex");
  await db.query("insert into sessions704 values($1,$2,now()+interval '8 hours')",[digest(token),account.id]);
- return send(200,{token,profile:{role:account.role,display_name:account.display_name}});
+ return send(200,{token,profile:{role:account.role,display_name:account.display_name,must_change_password:account.must_change_password}});
  }
  const token = req.headers.authorization?.replace(/^Bearer /,"") || "";
- const user = (await db.query("select a.id,a.role,a.display_name from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now()",[digest(token)])).rows[0];
+ const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
  if (!user) fail(401,"登入已失效，請重新登入");
  if (path === "/logout" && req.method === "POST") { await db.query("delete from sessions704 where token_hash=$1",[digest(token)]); return send(200,{ok:true}); }
+ if(path === "/account/password" && req.method === "POST"){
+ const value=await body(req);
+ if(typeof value.current_password!=="string" || typeof value.new_password!=="string") fail(400,"請填寫目前密碼與新密碼");
+ const client=await db.connect();
+ try{
+ await client.query("begin");
+ await client.query("lock table accounts704 in share row exclusive mode");
+ if(!(await client.query("select 1 from sessions704 where token_hash=$1 and account_id=$2 and expires_at>now()",[digest(token),user.id])).rowCount) fail(401,"登入已失效，請重新登入");
+ const account=(await client.query("select * from accounts704 where id=$1 for update",[user.id])).rows[0];
+ if(!account || account.disabled) fail(401,"帳戶已失效，請重新登入");
+ if(!await verify(value.current_password,account.password_hash)) fail(400,"目前密碼不正確");
+ if(await verify(value.new_password,account.password_hash)) fail(400,"新密碼必須與目前密碼不同");
+ await client.query("update accounts704 set password_hash=$1,must_change_password=false where id=$2",[await hash(value.new_password),user.id]);
+ await client.query("delete from sessions704 where account_id=$1",[user.id]);
+ const nextToken=randomBytes(32).toString("hex");
+ await client.query("insert into sessions704 values($1,$2,now()+interval '8 hours')",[digest(nextToken),user.id]);
+ await client.query("commit");
+ return send(200,{token:nextToken,profile:{role:account.role,display_name:account.display_name,must_change_password:false}});
+ }catch(error){await client.query("rollback");throw error;}finally{client.release();}
+ }
+ if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
  if (path === "/settings/banner" && ["GET","PUT"].includes(req.method)) {
  if (!["teacher","admin"].includes(user.role)) fail(403,"僅限教師或維護人員設定標語");
  if(req.method==="GET") return send(200,(await db.query("select enabled,content from login_banner704 where id=1")).rows[0]);
@@ -71,33 +93,45 @@ const server = createServer(async (req,res) => {
  return send(200,result.rows[0]);
  }
  if (path === "/admin/accounts" && ["GET","POST"].includes(req.method)) {
- if(!["admin","teacher"].includes(user.role)) fail(403,"僅限教師或管理員建立帳號");
- if(req.method==="GET") return send(200,(await db.query(user.role==="teacher" ? "select id,email,display_name,role from accounts704 where role='student' order by display_name" : "select id,email,display_name,role from accounts704 order by role,display_name")).rows);
+ if(!["admin","teacher"].includes(user.role)) fail(403,"僅限教師或管理員管理帳號");
+ if(req.method==="GET") return send(200,(await db.query(user.role==="teacher" ? "select id,email,display_name,role,disabled,must_change_password from accounts704 where role='student' order by display_name" : "select id,email,display_name,role,disabled,must_change_password from accounts704 order by role,display_name")).rows);
  const value=await body(req);
  const email=typeof value.email==="string"?value.email.trim().toLowerCase():"";
  const name=typeof value.name==="string"&&value.name.trim()?value.name.trim():email;
  if(user.role==="teacher" && value.role!=="student") fail(403,"教師只能建立學生帳號");
- if(!email || !["student","teacher","admin"].includes(value.role) || typeof value.password!=="string") fail(400,"請填寫登入帳號並選擇角色");
- const result=await db.query("insert into accounts704(id,email,display_name,role,password_hash) values($1,$2,$3,$4,$5) on conflict(email) do nothing returning id,email,display_name,role",[randomUUID(),email,name,value.role,await hash(value.password)]);
+ if(!email || !["student","teacher","admin"].includes(value.role) || typeof value.password!=="string" || (value.disabled!==undefined&&typeof value.disabled!=="boolean") || (value.must_change_password!==undefined&&typeof value.must_change_password!=="boolean")) fail(400,"帳號欄位格式錯誤");
+ const result=await db.query("insert into accounts704(id,email,display_name,role,password_hash,disabled,must_change_password) values($1,$2,$3,$4,$5,$6,$7) on conflict(email) do nothing returning id,email,display_name,role,disabled,must_change_password",[randomUUID(),email,name,value.role,await hash(value.password),value.disabled??false,value.must_change_password??false]);
  if(!result.rowCount) fail(409,"此帳號已存在");
  return send(201,result.rows[0]);
  }
  const accountMatch=path.match(/^\/admin\/accounts\/([0-9a-f-]{36})$/i);
  if(accountMatch && ["PATCH","DELETE"].includes(req.method)) {
- if(user.role!=="admin") fail(403,"僅限管理員管理帳號");
- const target=(await db.query("select id,email,display_name,role from accounts704 where id=$1",[accountMatch[1]])).rows[0];
+ if(!["admin","teacher"].includes(user.role) || (req.method==="DELETE"&&user.role!=="admin")) fail(403,"沒有管理此帳號的權限");
+ const value=req.method==="PATCH"?await body(req):{};
+ const client=await db.connect();
+ try{
+ await client.query("begin");
+ await client.query("lock table accounts704 in share row exclusive mode");
+ const target=(await client.query("select * from accounts704 where id=$1",[accountMatch[1]])).rows[0];
  if(!target) fail(404,"找不到帳號");
- if(req.method==="PATCH") {
- const value=await body(req); const name=typeof value.name==="string"?value.name.trim():"";
- if(!name || !["student","teacher","admin"].includes(value.role)) fail(400,"姓名或角色格式錯誤");
- if(target.id===user.id && value.role!=="admin") fail(400,"不能移除自己最後的管理員身分");
- if(target.role==="admin" && value.role!=="admin" && Number((await db.query("select count(*)::int as total from accounts704 where role='admin'")).rows[0].total)<=1) fail(400,"至少需保留一位管理員");
- const result=await db.query("update accounts704 set display_name=$1,role=$2 where id=$3 returning id,email,display_name,role",[name,value.role,target.id]);
- return send(200,result.rows[0]);
- }
+ if(user.role==="teacher" && (target.role!=="student" || (value.role!==undefined&&value.role!=="student"))) fail(403,"教師只能編輯學生帳號");
+ if(req.method==="DELETE"){
  if(target.id===user.id) fail(400,"不能刪除目前登入的帳號");
- if(target.role==="admin" && Number((await db.query("select count(*)::int as total from accounts704 where role='admin'")).rows[0].total)<=1) fail(400,"至少需保留一位管理員");
- await db.query("delete from accounts704 where id=$1",[target.id]); return send(200,{ok:true});
+ if(target.role==="admin"&&!target.disabled&&Number((await client.query("select count(*)::int as total from accounts704 where role='admin' and not disabled")).rows[0].total)<=1) fail(400,"至少需保留一位啟用中的管理員");
+ await client.query("delete from accounts704 where id=$1",[target.id]);
+ await client.query("commit");return send(200,{ok:true});
+ }
+ const email=value.email===undefined?target.email:typeof value.email==="string"?value.email.trim().toLowerCase():"";
+ const name=value.name===undefined?target.display_name:typeof value.name==="string"&&value.name.trim()?value.name.trim():email;
+ const role=value.role??target.role,disabled=value.disabled??target.disabled,mustChange=value.must_change_password??target.must_change_password;
+ if(!email || !["student","teacher","admin"].includes(role) || typeof disabled!=="boolean" || typeof mustChange!=="boolean" || (value.reset_password!==undefined&&typeof value.reset_password!=="boolean") || (value.reset_password&&typeof value.password!=="string")) fail(400,"帳號欄位格式錯誤");
+ if(target.id===user.id && (disabled||role!=="admin"&&user.role==="admin")) fail(400,"不能停用自己或移除自己的管理員身分");
+ if(target.role==="admin"&&!target.disabled&&(disabled||role!=="admin")&&Number((await client.query("select count(*)::int as total from accounts704 where role='admin' and not disabled")).rows[0].total)<=1) fail(400,"至少需保留一位啟用中的管理員");
+ const result=await client.query("update accounts704 set email=$1,display_name=$2,role=$3,disabled=$4,must_change_password=$5,password_hash=$6 where id=$7 returning id,email,display_name,role,disabled,must_change_password",[email,name,role,disabled,mustChange,value.reset_password?await hash(value.password):target.password_hash,target.id]);
+ await client.query("delete from sessions704 where account_id=$1",[target.id]);
+ await client.query("commit");
+ return send(200,{...result.rows[0],reauthenticate:target.id===user.id});
+ }catch(error){await client.query("rollback");if(error.code==="23505") fail(409,"此帳號已存在");throw error;}finally{client.release();}
  }
  if (path === "/admin/status" && req.method === "GET") {
  if (user.role !== "admin") fail(403,"僅限維護人員");
@@ -137,7 +171,7 @@ const server = createServer(async (req,res) => {
  fail(404,"找不到此功能");
  } catch(error) {
  if (!error.status) console.error("API/database operation failed");
- send(error.status || 503,{message:error.status ? error.message : "服務暫時無法使用，請稍後再試"});
+ send(error.status || 503,{message:error.status ? error.message : "服務暫時無法使用，請稍後再試",...(error.code==="PASSWORD_CHANGE_REQUIRED"?{code:error.code}:{})});
  }
 });
 server.requestTimeout=30000;
