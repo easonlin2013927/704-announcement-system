@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { hostname, platform, arch, cpus, totalmem, freemem, uptime } from "node:os";
 import { randomBytes, randomUUID } from "node:crypto";
 import { db, migrate } from "./db.mjs";
 import { verify, digest, hash } from "./password.mjs";
@@ -100,7 +101,8 @@ const server = createServer(async (req,res) => {
  if (path === "/admin/status" && req.method === "GET") {
  if (user.role !== "admin") fail(403,"僅限維護人員");
  const result = await db.query("select count(*)::int as total from announcements704");
- return send(200,{status:"ok",announcements:result.rows[0].total});
+ const counts=(await db.query("select (select count(*)::int from accounts704) as accounts,(select count(*)::int from countdowns704) as activities")).rows[0];
+ return send(200,{status:"ok",announcements:result.rows[0].total,...counts,host:hostname(),platform:platform()+" / "+arch(),cpu:`${cpus()[0]?.model || 'CPU'} / ${cpus().length} 核心`,memory:`${Math.round((totalmem()-freemem())/1048576)} / ${Math.round(totalmem()/1048576)} MB`,uptime:`${Math.floor(uptime()/86400)} 天 ${Math.floor(uptime()%86400/3600)} 小時`,checked_at:new Date().toISOString()});
  }
  if(path === "/countdowns" && req.method === "GET") return send(200,(await db.query("select * from countdowns704 order by target_at")).rows);
  const countdownMatch=path.match(/^\/countdowns\/([0-9a-f-]{36})$/i);

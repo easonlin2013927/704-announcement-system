@@ -1,4 +1,4 @@
-import { cloud } from "./cloud.js?v=0.6.0";
+import { cloud } from "./cloud.js?v=0.7.0";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
@@ -36,6 +36,7 @@ const state = {
 };
 
 const app = document.querySelector("#app");
+document.addEventListener("click",event=>{const menu=document.querySelector(".create-menu");if(menu&&!menu.contains(event.target)){document.querySelector("#create-options").hidden=true;document.querySelector("#create-toggle").setAttribute("aria-expanded","false");}});
 
 function escapeHtml(value = "") {
   return value.replace(/[&<>'"]/g, (char) => ({
@@ -94,6 +95,7 @@ function formatDate(value, detailed = false) {
 
 function icon(name, size = 20) {
   const paths = {
+    home: '<path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z"/>',
     bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
     search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -132,6 +134,7 @@ function render() {
   if (!state.session) return renderLogin();
   if (state.settingsOpen) return renderSettings();
   if (state.adminView === "accounts" && state.session.role === "admin") return renderAccounts();
+  if (state.adminView === "activities") return renderActivities();
   if (state.editingId !== null) return renderEditor();
   if (state.selectedId) return renderDetail();
   return renderDashboard();
@@ -187,10 +190,12 @@ function headerTemplate() {
     <header class="topbar">
       <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>校園公告</small></span></button>
       <nav class="top-actions">
+        <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
+        <button class="secondary-button" id="open-activities">活動</button>
         <span class="role-chip">${portals[state.session.role].label}端</span>
         <div class="user-block"><span class="avatar">${escapeHtml(state.session.name.charAt(0))}</span><span><strong>${escapeHtml(state.session.name)}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
 ${state.session.role === "admin" ? '<button class="secondary-button" id="open-accounts">帳號管理</button>' : ""}
-${["teacher","admin"].includes(state.session.role) ? '<button class="secondary-button" id="open-settings">設定</button>' : ""}
+<button class="secondary-button" id="open-settings">設定</button>
         <button class="icon-button" id="logout" title="登出">${icon("logout")}</button>
       </nav>
     </header>${state.marquee.enabled && state.marquee.content ? `<div class="site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}`;
@@ -223,42 +228,35 @@ function renderAccounts() {
   app.innerHTML = `${headerTemplate()}<main class="editor-shell">
     <button class="back-button" id="accounts-back">${icon("back",18)} 返回管理首頁</button>
     <div class="editor-heading"><span class="eyebrow dark">ACCOUNT ADMINISTRATION</span><h1>帳號管理</h1><p>建立學生、教師與管理員帳號；教師與學生使用電子郵件登入，管理員可使用不含 @ 的維護帳號。</p></div>
-    <form class="editor-card" id="account-form"><h2>新增帳號</h2><div class="form-grid">
+    <button class="primary-button" id="create-person">建立人員</button><dialog id="person-dialog" class="form-dialog"><button class="back-button" id="close-person" type="button">關閉</button><form class="editor-card" id="account-form"><h2>新增帳號</h2><div class="form-grid">
       <label>登入帳號<input name="email" required maxlength="254" placeholder="學生／教師輸入電子郵件；管理員可用維護帳號"></label>
       <label>顯示姓名<input name="name" required maxlength="80"></label>
       <label>角色<select name="role"><option value="student">學生</option><option value="teacher">教師</option><option value="admin">管理員</option></select></label>
       <label>初始密碼<input name="password" required minlength="10" maxlength="512" type="password" autocomplete="new-password"></label>
-    </div><footer class="editor-footer"><span>密碼至少 10 字元，請安全地將登入資料交給本人。</span><button class="primary-button">建立帳號</button></footer></form>
+    </div><footer class="editor-footer"><span>密碼至少 10 字元，請安全地將登入資料交給本人。</span><button class="primary-button">建立帳號</button></footer></form></dialog>
     <section class="editor-card"><h2>現有帳號</h2><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section>
   </main>`;
   bindHeader();
-  document.querySelector("#accounts-back").addEventListener("click", () => { state.adminView="dashboard"; render(); });
+  document.querySelector("#accounts-back").addEventListener("click", goHome);
+  const personDialog=document.querySelector("#person-dialog");
+  document.querySelector("#create-person").addEventListener("click",()=>personDialog.showModal());
+  document.querySelector("#close-person").addEventListener("click",()=>personDialog.close());
   const message=document.querySelector("#accounts-message"), list=document.querySelector("#accounts-list");
   const refresh=async()=>{ try { state.accounts=await cloud.accounts(); list.innerHTML=state.accounts.map(account=>`<div class="account-row" data-account="${account.id}"><strong>${escapeHtml(account.display_name)}</strong><span>${escapeHtml(account.email)}</span><select aria-label="${escapeHtml(account.display_name)}角色"><option value="student" ${account.role==="student"?"selected":""}>學生</option><option value="teacher" ${account.role==="teacher"?"selected":""}>教師</option><option value="admin" ${account.role==="admin"?"selected":""}>管理員</option></select><button class="danger-button" data-remove-account="${account.id}">刪除</button></div>`).join("")||"<p>尚無帳號。</p>"; message.textContent=""; } catch(error){message.textContent=error.message;} };
-  document.querySelector("#account-form").addEventListener("submit",async event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget));try{await cloud.createAccount(data);event.currentTarget.reset();toast("帳號已建立");await refresh();}catch(error){toast(error.message,"error");}});
+  document.querySelector("#account-form").addEventListener("submit",async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector(".primary-button");const data=Object.fromEntries(new FormData(form));button.disabled=true;try{await cloud.createAccount(data);form.reset();personDialog.close();toast("帳號已建立");await refresh();}catch(error){toast(error.message,"error");}finally{button.disabled=false;}});
   list.addEventListener("change",async event=>{if(!event.target.matches("select"))return;const row=event.target.closest("[data-account]");const account=state.accounts.find(item=>item.id===row.dataset.account);try{await cloud.updateAccount(account.id,{name:account.display_name,role:event.target.value});toast("角色已更新");await refresh();}catch(error){toast(error.message,"error");await refresh();}});
   list.addEventListener("click",async event=>{const button=event.target.closest("[data-remove-account]");if(!button)return;const account=state.accounts.find(item=>item.id===button.dataset.removeAccount);if(!window.confirm(`確定刪除帳號「${account.display_name}」？`))return;try{await cloud.deleteAccount(account.id);toast("帳號已刪除");await refresh();}catch(error){toast(error.message,"error");}});
   refresh();
 }
 
+function goHome(){state.selectedId=null;state.editingId=null;state.settingsOpen=false;state.adminView="dashboard";render();}
+function openActivities(){state.selectedId=null;state.editingId=null;state.settingsOpen=false;state.adminView="activities";render();}
 function bindHeader() {
-  document.querySelector("#open-settings")?.addEventListener("click", () => { state.settingsOpen = true; render(); });
-  document.querySelector("#open-accounts")?.addEventListener("click", () => { state.adminView="accounts"; render(); });
-  document.querySelector("[data-home]")?.addEventListener("click", () => {
-    state.selectedId = null;
-    state.editingId = null;
-    state.settingsOpen = false;
-    render();
-  });
-  document.querySelector("#logout")?.addEventListener("click", () => {
-    state.session = null;
-    state.selectedId = null;
-    state.editingId = null;
-    cloud.logout();
-    state.settingsOpen = false;
-    render();
-    refreshBanner();
-  });
+  document.querySelector("#open-settings")?.addEventListener("click",()=>{state.settingsOpen=true;state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();});
+  document.querySelector("#open-accounts")?.addEventListener("click",()=>{state.settingsOpen=false;state.adminView="accounts";state.editingId=null;state.selectedId=null;render();});
+  document.querySelector("#open-activities")?.addEventListener("click",openActivities);
+  document.querySelectorAll("[data-home]").forEach(button=>button.addEventListener("click",goHome));
+  document.querySelector("#logout")?.addEventListener("click",()=>{cloud.logout();state.session=null;state.settingsOpen=false;state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();refreshBanner();});
 }
 
 function filteredAnnouncements() {
@@ -272,6 +270,23 @@ function filteredAnnouncements() {
 function updateCountdowns(){document.querySelectorAll("[data-countdown-at]").forEach(node=>{const seconds=Math.max(0,Math.ceil((new Date(node.dataset.countdownAt).getTime()-Date.now())/1000));node.textContent=seconds ? `${Math.floor(seconds/86400)} 天 ${String(Math.floor(seconds%86400/3600)).padStart(2,"0")} 時 ${String(Math.floor(seconds%3600/60)).padStart(2,"0")} 分 ${String(seconds%60).padStart(2,"0")} 秒` : "活動已開始";});}
 setInterval(updateCountdowns,1000);
 
+function renderActivities(){
+ const isTeacher=["teacher","admin"].includes(state.session.role);
+ app.innerHTML=`${headerTemplate()}<main class="page-shell"><section class="hero-row"><div><span class="eyebrow dark">EVENTS</span><h1>活動倒數</h1></div>${isTeacher?'<button id="create-activity" class="primary-button">建立活動</button>':""}</section>
+<section class="countdown-section"><div class="section-heading"><h2>活動倒數</h2></div><div class="countdown-grid">${state.countdowns.map(item=>`<article class="editor-card countdown-card"><h3>${escapeHtml(item.title)}</h3><time>${formatDate(item.target_at,true)}</time><p class="countdown-value" data-countdown-at="${escapeHtml(item.target_at)}"></p>${isTeacher?`<button class="secondary-button" data-edit-countdown="${item.id}">編輯</button> <button class="danger-button" data-delete-countdown="${item.id}">刪除</button>`:""}</article>`).join("") || '<p class="muted">目前沒有倒數活動。</p>'}</div>${isTeacher?`<dialog id="activity-dialog" class="form-dialog"><button type="button" id="close-activity" class="back-button">關閉</button><form id="countdown-form" class="editor-card"><h3 id="countdown-form-title">新增倒數活動</h3><input type="hidden" name="id"><div class="form-grid"><label>活動名稱<input name="title" required maxlength="80"></label><label>活動時間（目前裝置時區）<input name="target_at" type="datetime-local" required></label></div><footer class="editor-footer"><button class="primary-button">儲存活動</button><button type="reset" class="secondary-button">取消編輯</button></footer></form></dialog>`:""}</section>
+ </main>`;
+ bindHeader();
+ document.querySelector("#create-activity")?.addEventListener("click",()=>{document.querySelector("#countdown-form").reset();document.querySelector("#activity-dialog").showModal();});
+ document.querySelector("#close-activity")?.addEventListener("click",()=>document.querySelector("#activity-dialog").close());
+  updateCountdowns();
+  const countdownForm=document.querySelector("#countdown-form");
+  countdownForm?.addEventListener("submit",async event=>{event.preventDefault();const data=new FormData(countdownForm);const button=countdownForm.querySelector(".primary-button");button.disabled=true;try{await cloud.saveCountdown({title:data.get("title"),target_at:new Date(data.get("target_at")).toISOString()},data.get("id"));state.countdowns=await cloud.countdowns();renderActivities();toast("活動已儲存");}catch(error){toast(error.message,"error");}finally{button.disabled=false;}});
+  document.querySelectorAll("[data-edit-countdown]").forEach(button=>button.addEventListener("click",()=>{const item=state.countdowns.find(row=>row.id===button.dataset.editCountdown);const date=new Date(item.target_at);const local=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);countdownForm.elements.id.value=item.id;countdownForm.elements.title.value=item.title;countdownForm.elements.target_at.value=local;document.querySelector("#countdown-form-title").textContent="編輯倒數活動";document.querySelector("#activity-dialog").showModal();countdownForm.elements.title.focus();}));
+  countdownForm?.addEventListener("reset",()=>{document.querySelector("#countdown-form-title").textContent="新增倒數活動";queueMicrotask(()=>{countdownForm.elements.id.value="";});});
+  document.querySelectorAll("[data-delete-countdown]").forEach(button=>button.addEventListener("click",async()=>{if(!confirm("確定刪除此倒數活動？"))return;try{await cloud.deleteCountdown(button.dataset.deleteCountdown);state.countdowns=await cloud.countdowns();renderActivities();}catch(error){toast(error.message,"error");}}));
+
+}
+
 function renderDashboard() {
   const isTeacher = ["teacher","admin"].includes(state.session.role);
   const isAdmin = state.session.role === "admin";
@@ -281,10 +296,8 @@ function renderDashboard() {
     <main class="page-shell">
       <section class="hero-row">
         <div><span class="eyebrow dark">${isTeacher ? "TEACHER CONSOLE" : "STUDENT BULLETIN"}</span><h1>${isTeacher ? "公告管理" : "校園最新公告"}</h1><p>${isTeacher ? "清楚傳遞每一項校園資訊。" : "今天也別忘了看看校園裡的新消息。"}</p></div>
-        ${isTeacher ? `<button class="primary-button" id="new-post">${icon("plus", 18)} 發布新公告</button>` : `<div class="date-card"><span>${new Intl.DateTimeFormat("zh-TW", { weekday: "long" }).format(new Date())}</span><strong>${new Intl.DateTimeFormat("zh-TW", { month: "long", day: "numeric" }).format(new Date())}</strong></div>`}
+        ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden><button id="new-post">公告</button><button id="new-activity">活動</button></div></div>` : ""}
       </section>
-      ${isAdmin ? `<section class="article-paper admin-service-status"><strong>系統狀態</strong><span id="admin-service-status" role="status">檢查中…</span><button class="secondary-button" id="refresh-admin-status">重新檢查</button></section>` : ""}
-      <section class="countdown-section"><div class="section-heading"><h2>活動倒數</h2></div><div class="countdown-grid">${state.countdowns.map(item=>`<article class="editor-card countdown-card"><h3>${escapeHtml(item.title)}</h3><time>${formatDate(item.target_at,true)}</time><p class="countdown-value" data-countdown-at="${escapeHtml(item.target_at)}"></p>${isTeacher?`<button class="secondary-button" data-edit-countdown="${item.id}">編輯</button> <button class="danger-button" data-delete-countdown="${item.id}">刪除</button>`:""}</article>`).join("") || '<p class="muted">目前沒有倒數活動。</p>'}</div>${isTeacher?`<form id="countdown-form" class="editor-card"><h3 id="countdown-form-title">新增倒數活動</h3><input type="hidden" name="id"><div class="form-grid"><label>活動名稱<input name="title" required maxlength="80"></label><label>活動時間（目前裝置時區）<input name="target_at" type="datetime-local" required></label></div><footer class="editor-footer"><button class="primary-button">儲存活動</button><button type="reset" class="secondary-button">取消編輯</button></footer></form>`:""}</section>
       <section class="toolbar" aria-label="公告篩選">
         <label class="search-box">${icon("search", 19)}<input id="search" value="${escapeHtml(state.search)}" placeholder="搜尋標題、內容或發布教師"></label>
         <div class="filter-tabs">
@@ -297,14 +310,14 @@ function renderDashboard() {
       </div>
     </main>`;
   bindHeader();
-  const refreshStatus=document.querySelector("#refresh-admin-status");
-  updateCountdowns();
-  const countdownForm=document.querySelector("#countdown-form");
-  countdownForm?.addEventListener("submit",async event=>{event.preventDefault();const data=new FormData(countdownForm);const button=countdownForm.querySelector(".primary-button");button.disabled=true;try{await cloud.saveCountdown({title:data.get("title"),target_at:new Date(data.get("target_at")).toISOString()},data.get("id"));state.countdowns=await cloud.countdowns();renderDashboard();toast("活動已儲存");}catch(error){toast(error.message,"error");}finally{button.disabled=false;}});
-  document.querySelectorAll("[data-edit-countdown]").forEach(button=>button.addEventListener("click",()=>{const item=state.countdowns.find(row=>row.id===button.dataset.editCountdown);const date=new Date(item.target_at);const local=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);countdownForm.elements.id.value=item.id;countdownForm.elements.title.value=item.title;countdownForm.elements.target_at.value=local;document.querySelector("#countdown-form-title").textContent="編輯倒數活動";countdownForm.elements.title.focus();}));
-  countdownForm?.addEventListener("reset",()=>{document.querySelector("#countdown-form-title").textContent="新增倒數活動";queueMicrotask(()=>{countdownForm.elements.id.value="";});});
-  document.querySelectorAll("[data-delete-countdown]").forEach(button=>button.addEventListener("click",async()=>{if(!confirm("確定刪除此倒數活動？"))return;try{await cloud.deleteCountdown(button.dataset.deleteCountdown);state.countdowns=await cloud.countdowns();renderDashboard();}catch(error){toast(error.message,"error");}}));
-  if(refreshStatus){const status=document.querySelector("#admin-service-status");const check=async()=>{refreshStatus.disabled=true;try{const result=await cloud.status();status.textContent=`API 與資料庫連線正常；目前共有 ${result.announcements} 則公告。`;}catch(error){status.textContent=error.message;}finally{refreshStatus.disabled=false;}};refreshStatus.addEventListener("click",check);check();}
+  const menu=document.querySelector(".create-menu"),toggle=document.querySelector("#create-toggle"),options=document.querySelector("#create-options");
+  const showMenu=value=>{if(options){options.hidden=!value;toggle.setAttribute("aria-expanded",String(value));}};
+  toggle?.addEventListener("click",()=>showMenu(true));
+  menu?.addEventListener("mouseenter",()=>showMenu(true));
+  menu?.addEventListener("mouseleave",()=>showMenu(false));
+  menu?.addEventListener("focusout",event=>{if(!menu.contains(event.relatedTarget))showMenu(false);});
+  menu?.addEventListener("keydown",event=>{if(event.key==="Escape"){showMenu(false);toggle.focus();}});
+  document.querySelector("#new-activity")?.addEventListener("click",()=>{openActivities();document.querySelector("#activity-dialog")?.showModal();});
   document.querySelector("#new-post")?.addEventListener("click", () => { state.editingId = "new"; render(); });
   document.querySelector("#search").addEventListener("input", (event) => {
     state.search = event.target.value;
@@ -478,11 +491,19 @@ async function refreshBanner() {
   }
 }
 
+function bindStatusTable(){
+ const button=document.querySelector("#refresh-status-table");if(!button)return;
+ const message=document.querySelector("#status-message"),body=document.querySelector("#status-rows");
+ const refresh=async()=>{button.disabled=true;try{const s=await cloud.status();const rows=[["API","正常"],["資料庫","PostgreSQL／連線正常"],["公告數量",s.announcements],["活動數量",s.activities],["人員數量",s.accounts],["執行環境名稱",s.host],["作業系統",s.platform],["處理器",s.cpu],["主機記憶體",s.memory],["主機運作時間",s.uptime],["更新時間",formatDate(s.checked_at,true)]];body.innerHTML=rows.map(([key,value])=>`<tr><th scope="row">${key}</th><td>${escapeHtml(String(value??"—"))}</td></tr>`).join("");message.textContent="";}catch(error){message.textContent=error.message;}finally{button.disabled=false;}};
+ button.addEventListener("click",refresh);refresh();
+}
 function renderSettings() {
+  if(state.session.role==="student"){app.innerHTML=`${headerTemplate()}<main class="editor-shell"><h1>設定</h1><section class="editor-card"><h2>個人資訊</h2><p>${escapeHtml(state.session.name)}</p><p>學生</p></section></main>`;bindHeader();return;}
   app.innerHTML = `${headerTemplate()}<main class="editor-shell settings-shell">
     <button class="back-button" id="close-settings">${icon("back",18)} 返回</button>
-    <div class="editor-heading"><span class="eyebrow dark">PORTAL SETTINGS</span><h1>登入頁設定</h1>
+    <div class="editor-heading"><span class="eyebrow dark">PORTAL SETTINGS</span><h1>設定</h1>
     <p>教師與維護人員共用設定，會套用至三個登入入口。</p></div>
+    ${state.session.role==="admin"?'<section class="editor-card system-status"><h2>系統狀態</h2><p id="status-message" role="status">載入中…</p><div class="table-scroll"><table class="status-table"><caption>服務執行環境資訊</caption><thead><tr><th scope="col">項目</th><th scope="col">目前狀態</th></tr></thead><tbody id="status-rows"></tbody></table></div><button id="refresh-status-table" class="secondary-button">重新整理</button></section>':""}
     <section class="editor-card"><p id="settings-message" role="status">載入設定中…</p>
     <div id="settings-fields" hidden>
       <label class="switch-row"><input id="banner-enabled" type="checkbox"><span class="switch"></span><span><strong>啟用標語編輯器與登入標語</strong><small>停用會隱藏標語，已儲存的內容仍會保留。</small></span></label>
@@ -493,7 +514,8 @@ function renderSettings() {
       ${state.session.role === "admin" ? `<hr><h2>網站頂端跑馬公告</h2><label class="switch-row"><input id="marquee-enabled" type="checkbox"><span class="switch"></span><span><strong>顯示全站跑馬公告</strong><small>公告會顯示在登入頁與已登入頁面的最上方。</small></span></label><label class="editor-label" for="marquee-content">跑馬公告文字</label><textarea id="marquee-content" maxlength="1000" rows="3" placeholder="輸入要公告給全站的短訊息"></textarea><div class="editor-footer"><span>最多 1000 字；停用後內容仍會保留。</span><button id="save-marquee" class="secondary-button">儲存跑馬公告</button></div>` : ""}
     </div></section></main>`;
   bindHeader();
-  document.querySelector("#close-settings").addEventListener("click", () => { state.settingsOpen = false; render(); });
+  document.querySelector("#close-settings").addEventListener("click",goHome);
+  bindStatusTable();
   const message = document.querySelector("#settings-message");
   const editor = bindRichEditor();
   const fields = document.querySelector("#settings-fields");

@@ -115,3 +115,21 @@ label { display: block; color: #344054; font-size: 14px; font-weight: 600; }.log
 .countdown-card { padding:24px; }
 .countdown-card h3 { margin-top:0; }
 .countdown-value { color:#bcadff; font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+.create-menu { position:relative; z-index:12; }
+.create-options { position:absolute; right:0; top:100%; min-width:180px; padding:8px; background:#242030; border:1px solid #ffffff22; border-radius:12px; box-shadow:0 16px 40px #0006; }
+.create-options button { display:block; width:100%; text-align:left; padding:12px 16px; border:0; border-radius:8px; color:#eee8ff; background:transparent; font:inherit; cursor:pointer; }
+.create-options button:hover,.create-options button:focus-visible { background:#7964e844; }
+.form-dialog { width:min(720px,calc(100% - 32px)); max-height:85svh; overflow:auto; padding:24px; border:1px solid #ffffff22; border-radius:20px; color:#eee8ff; background:#1c1927; }
+.form-dialog::backdrop { background:#090710b8; backdrop-filter:blur(5px); }
+.form-dialog .editor-card { padding:12px; border:0; box-shadow:none!important; }
+.editor-heading + #create-person { margin-bottom:24px; }
+.table-scroll { overflow-x:auto; margin:20px 0; }
+.status-table { width:100%; border-collapse:collapse; text-align:left; font-size:14px; }
+.status-table caption { text-align:left; color:#b3aabe; margin-bottom:14px; }
+.status-table th,.status-table td { border:1px solid #ffffff14; padding:13px 18px; overflow-wrap:anywhere; }
+.status-table thead,.status-table tbody th { background:#ffffff04; }
+.status-table tbody th { width:35%; color:#b9b0c8; font-weight:500; }
+.system-status { margin-bottom:24px; }
+.top-actions { flex-wrap:wrap; }
+@media(max-width:700px){.topbar {height:auto!important; min-height:76px; padding-top:12px; padding-bottom:12px; gap:10px; flex-wrap:wrap;}.top-actions {width:100%; justify-content:flex-end;}.top-actions .user-block {display:none;}.create-menu {align-self:flex-end;}.hero-row .create-menu .primary-button {width:auto;} }
+.form-dialog label { color:#c9c0d8!important; }
