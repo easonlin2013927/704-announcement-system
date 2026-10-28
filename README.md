@@ -4,12 +4,12 @@
 
 ## 操作文件
 
-- [學生使用手冊](docs/wiki/Student-Guide.md)：登入、閱讀、搜尋與常見問題，不包含教師操作。
-- [教師使用手冊](docs/wiki/Teacher-Guide.md)：發布、格式設定、置頂、編輯與刪除。
+- [學生使用手冊](https://github.com/easonlin2013927/704-announcement-system/wiki/Student%E2%80%90Guide)：登入、閱讀、搜尋與常見問題，不包含教師操作。
+- [教師使用手冊](https://github.com/easonlin2013927/704-announcement-system/wiki/Teacher%E2%80%90Guide)：發布、格式設定、置頂、編輯與刪除。
 - [完整使用中心](docs/wiki/Home.md)
 - [管理員設定與維護](docs/wiki/Administrator-Setup.md)
 
-Wiki 全文來源保存在 docs/wiki。原生 GitHub Wiki 需另行啟用與同步；以上連結直接使用主 repository 文件，不依賴 Wiki 啟用。
+原生 GitHub Wiki 已發布首頁、學生、教師與管理員手冊。全文來源另保存在 docs/wiki，方便維護與備份。
 
 ## 目前狀態
 
@@ -50,3 +50,4 @@ node scripts/serve.mjs
 ## 資料保留
 
 公告不會因關閉瀏覽器、清除快取或重新部署而刪除。直到教師明確刪除前，系統不設定到期清除。資料庫服務維護、備份及復原仍由管理員負責，無法保證外部服務永不中斷。
+
