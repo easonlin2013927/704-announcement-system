@@ -1,5 +1,7 @@
 # 維護人員使用說明
 
+[前往維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.4.1#/admin/login)
+
 請使用 README 的維護人員獨立入口，輸入 role 為 admin 的帳號。教師或學生帳號不能登入此入口。
 
 登入後可查看 API／資料庫連線狀態與公告總數，按「重新檢查」更新。維護端不提供公告新增、修改、刪除或網站內帳號管理。

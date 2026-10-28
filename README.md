@@ -2,7 +2,7 @@
 
 教師發布富文字公告，學生登入閱讀；前端使用 GitHub Pages，後端為自架 Node.js API 與 PostgreSQL，透過 Cloudflare Tunnel 提供 HTTPS。
 
-## 獨立登入入口
+## 各系統登入網址
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
@@ -24,7 +24,7 @@
 - [1Panel 部署與帳號設定](deploy/README.md)
 - [既有 Wiki](https://github.com/easonlin2013927/704-announcement-system/wiki)
 
-主 repository 文件與目前版本同步。既有 Wiki 可能仍有前版登入步驟，請以上述對應文件為準。
+三個登入網址亦列於 [Wiki 首頁](https://github.com/easonlin2013927/704-announcement-system/wiki)，各身分手冊提供自己的登入入口。
 
 ## 功能與資料保留
 
