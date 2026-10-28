@@ -57,6 +57,11 @@ input,select,textarea,.editor-card textarea,.rich-editor,.format-toolbar,.editor
 .status-table tbody th,.status-table caption,.check-option { color:var(--muted)!important; }
 .topbar { min-height:76px; height:auto!important; padding-top:12px; padding-bottom:12px; gap:14px; flex-wrap:wrap; }
 .login-masthead .repo-button { color:var(--accent); font-size:12px; }
+.rich-content img,.rich-editor img { display:block; max-width:100%; height:auto; margin:20px auto; border-radius:12px; }
+.rich-content a,.rich-editor a { color:var(--accent); text-decoration:underline; overflow-wrap:anywhere; }
+.editor-paste-tip { color:var(--muted); font-size:12px; line-height:1.6; margin:14px 0; }
+.inline-image-tool { position:relative; display:inline-flex; align-items:center; overflow:hidden; padding:8px 10px; cursor:pointer; font-size:13px; color:var(--ink); }
+.inline-image-tool input { position:absolute; inset:0; opacity:0; width:100%; cursor:pointer; }
 
 .blog-studio { max-width:1440px; }
 .studio-heading { display:flex; justify-content:space-between; align-items:center; gap:20px; }

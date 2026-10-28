@@ -55,7 +55,7 @@ function stripHtml(html) {
 function sanitizeHtml(html = "") {
   const template = document.createElement("template");
   template.innerHTML = html;
-  const allowed = new Set(["P", "BR", "STRONG", "B", "EM", "I", "U", "MARK", "UL", "OL", "LI", "H2", "H3", "BLOCKQUOTE", "A", "SPAN", "FONT"]);
+  const allowed = new Set(["P", "BR", "STRONG", "B", "EM", "I", "U", "MARK", "UL", "OL", "LI", "H2", "H3", "BLOCKQUOTE", "A", "SPAN", "FONT", "IMG"]);
 
   template.content.querySelectorAll("*").forEach((element) => {
     if (["SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED"].includes(element.tagName)) {
@@ -67,9 +67,18 @@ function sanitizeHtml(html = "") {
       return;
     }
 
+    const imageSource = element.tagName === "IMG" ? element.getAttribute("src") : null;
+    const imageAlt = element.getAttribute("alt") || "公告圖片";
     const highlight = element.style.backgroundColor;
     const href = element.tagName === "A" ? element.getAttribute("href") : null;
     [...element.attributes].forEach((attribute) => element.removeAttribute(attribute.name));
+
+    if (element.tagName === "IMG") {
+      if (!imageSource || imageSource.length > 100000 || !/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(imageSource)) { element.remove(); return; }
+      element.setAttribute("src", imageSource);
+      element.setAttribute("alt", imageAlt);
+      element.setAttribute("loading", "lazy");
+    }
 
     if (highlight) element.style.backgroundColor = highlight;
     if (element.tagName === "A" && href) {
@@ -85,6 +94,22 @@ function sanitizeHtml(html = "") {
       }
     }
   });
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  const textNodes = [];
+  while (walker.nextNode()) if (!walker.currentNode.parentElement?.closest("a")) textNodes.push(walker.currentNode);
+  for (const node of textNodes) {
+    const pattern = /https?:\/\/[^\s<>"'，。！？；、（）【】]+/g;
+    const fragment = document.createDocumentFragment();
+    let last = 0, match;
+    while ((match = pattern.exec(node.textContent))) {
+      const url = match[0].replace(/[.,!?;:)\]}]+$/, "");
+      fragment.append(document.createTextNode(node.textContent.slice(last, match.index)));
+      const link = document.createElement("a");
+      link.href = url; link.textContent = url; link.target = "_blank"; link.rel = "noopener noreferrer";
+      fragment.append(link); last = match.index + url.length;
+    }
+    if (last) { fragment.append(document.createTextNode(node.textContent.slice(last))); node.replaceWith(fragment); }
+  }
   return template.innerHTML;
 }
 
@@ -198,7 +223,7 @@ function headerTemplate() {
   const isTeacher = state.session.role === "teacher";
   return `
     <header class="topbar">
-      <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>班級公告</small></span></button>
+      <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">${icon("bell", 26)}</span><span><strong>704公告系統</strong><small>班級公告</small></span></button>
       <nav class="top-actions">
         <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-announcement-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
         <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
@@ -420,7 +445,7 @@ function renderEditor() {
   const canManageComments=!existing||state.session.role==="admin"||existing.author_id===state.session.id;
   app.innerHTML = `${headerTemplate()}<main class="editor-shell blog-studio">
     <button class="back-button" id="cancel-edit">${icon("back", 18)} 取消並返回</button>
-    <div class="editor-heading studio-heading"><div><span class="eyebrow dark">704 · PUBLISHING STUDIO</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>寫下班級的新消息，讓重要的事被看見。</p></div><button type="button" class="secondary-button" id="focus-writing" aria-pressed="false">專注寫作</button></div>
+    <div class="editor-heading studio-heading"><div><span class="eyebrow dark">704 · PUBLISHING STUDIO · v0.12.0</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>寫下班級的新消息，讓重要的事被看見。</p></div><button type="button" class="secondary-button" id="focus-writing" aria-pressed="false">專注寫作</button></div>
     <form id="editor-form" class="editor-card studio-form">
       <div class="studio-workspace">
       <section class="studio-document" aria-label="文章編輯區">
@@ -479,7 +504,8 @@ function renderEditor() {
   document.querySelector("#editor-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
-    if (!stripHtml(editor.innerHTML).trim()) { toast("請輸入公告內容", "error"); editor.focus(); return; }
+    if (!stripHtml(editor.innerHTML).trim() && !editor.querySelector("img")) { toast("請輸入公告內容或貼上圖片", "error"); setWritingMode(false); editor.focus(); return; }
+    if (new TextEncoder().encode(JSON.stringify({content:sanitizeHtml(editor.innerHTML)})).length > 240000) { toast("公告圖片總量過大，請減少圖片後再發布", "error"); return; }
     const announcement = {
       id: existing?.id || crypto.randomUUID(), title: data.get("title").trim(), category: data.get("category"),
       author: state.session.name, authorInitial: state.session.name.charAt(0), audience: data.get("audience"),
@@ -507,13 +533,15 @@ async function deleteAnnouncement(id) {
 function editorMarkup(content = "") {
   return `      <div class="rich-editor-wrap">
         <div class="format-toolbar" role="toolbar" aria-label="文字格式">
+          <label class="inline-image-tool" title="插入圖片"><span>＋圖片</span><input id="article-image-file" type="file" accept="image/png,image/jpeg,image/webp" aria-label="插入公告圖片"></label>
           <button type="button" data-command="undo" title="復原" aria-label="復原">↶</button><button type="button" data-command="redo" title="重做" aria-label="重做">↷</button><span class="divider"></span>
           <button type="button" data-command="bold" title="粗體">${icon("bold", 18)}</button><button type="button" data-command="italic" title="斜體">${icon("italic", 18)}</button><button type="button" data-command="underline" title="底線">${icon("underline", 18)}</button><span class="divider"></span>
           <button type="button" data-command="insertUnorderedList" title="項目符號">${icon("list", 18)}</button><button type="button" data-command="insertOrderedList" title="編號清單">${icon("ordered", 18)}</button><button type="button" id="add-link" title="插入連結">${icon("link", 18)}</button><span class="divider"></span>
           <button type="button" id="apply-highlight" title="螢光筆"><span class="highlight-icon">A</span></button><label class="color-tool" title="螢光筆顏色"><input type="color" id="highlight-color" aria-label="螢光筆顏色" value="#fef08a"></label>
           <select id="block-format" aria-label="段落格式"><option value="p">一般文字</option><option value="h2">大標題</option><option value="h3">小標題</option><option value="blockquote">引用文字</option></select>
         </div>
-        <div id="rich-editor" class="rich-editor" contenteditable="true" role="textbox" aria-label="富文字內容" aria-multiline="true" data-placeholder="在這裡輸入公告內容…">${sanitizeHtml(content)}</div>
+        <p class="editor-paste-tip">可直接貼上截圖（Ctrl＋V）或插入圖片；貼上網址會自動轉成超連結。</p>
+        <div id="rich-editor" class="rich-editor" contenteditable="true" role="textbox" aria-label="富文字內容" aria-multiline="true" data-placeholder="寫下公告，或直接貼上截圖與連結…">${sanitizeHtml(content)}</div>
       </div>`;
 }
 
@@ -531,6 +559,37 @@ function bindRichEditor() {
     editor.focus();
     if (savedRange) { const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(savedRange); }
   };
+  let processingImage = false;
+  const insertImage = async file => {
+    if (processingImage) return;
+    processingImage = true;
+    capture();
+    const buttons = Array.from(editor.closest("form")?.querySelectorAll('[type="submit"]') || []).map(button => [button,button.disabled]);
+    buttons.forEach(([button]) => button.disabled = true);
+    try {
+      const source = await prepareArticleImage(file);
+      if (!editor.isConnected) return;
+      if (new TextEncoder().encode(editor.innerHTML).length + source.length > 230000) throw new Error("圖片總量過大，請先移除部分圖片");
+      restore();
+      document.execCommand("insertHTML", false, `<p><img src="${source}" alt="公告圖片"></p><p><br></p>`);
+      capture(); editor.dispatchEvent(new Event("input", { bubbles:true }));
+      toast("圖片已加入，發布或儲存後才會保存");
+    } catch (error) { toast(error.message, "error"); }
+    finally { processingImage = false; buttons.forEach(([button,disabled]) => button.disabled = disabled); }
+  };
+  editor.closest("form")?.addEventListener("submit", event => { if(processingImage){event.preventDefault();event.stopImmediatePropagation();toast("圖片處理中，請稍候", "error");} }, true);
+  editor.addEventListener("paste", event => {
+    const clipboard = event.clipboardData;
+    const image = Array.from(clipboard?.items || []).find(item => item.type.startsWith("image/"));
+    if (image) { event.preventDefault(); const file=image.getAsFile(); if(file)insertImage(file); return; }
+    const html = clipboard?.getData("text/html"), text = clipboard?.getData("text/plain");
+    if (html || text) {
+      event.preventDefault();
+      document.execCommand("insertHTML", false, sanitizeHtml(html || escapeHtml(text).replace(/\r?\n/g,"<br>")));
+      capture(); editor.dispatchEvent(new Event("input",{bubbles:true}));
+    }
+  });
+  document.querySelector("#article-image-file").addEventListener("change", event => { const file=event.target.files[0]; if(file)insertImage(file); event.target.value=""; });
   document.querySelectorAll("[data-command]").forEach((button) => button.addEventListener("mousedown", (event) => {
     event.preventDefault(); restore(); document.execCommand(button.dataset.command, false); capture(); editor.dispatchEvent(new Event("input",{bubbles:true}));
   }));
@@ -555,6 +614,24 @@ function bindRichEditor() {
     if (url && /^https?:\/\//i.test(url)) document.execCommand("createLink", false, url);
   });
   return editor;
+}
+
+async function prepareArticleImage(file) {
+  if (!/^image\/(png|jpeg|webp)$/.test(file.type)) throw new Error("請使用 PNG、JPEG 或 WebP 圖片");
+  if (file.size > 10 * 1024 * 1024) throw new Error("單張圖片最多 10 MB");
+  const bitmap = await createImageBitmap(file);
+  try {
+    const canvas = document.createElement("canvas");
+    let scale = Math.min(1, 1600 / Math.max(bitmap.width,bitmap.height));
+    for (let attempt=0; attempt<5; attempt++) {
+      canvas.width=Math.max(1,Math.round(bitmap.width*scale)); canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+      canvas.getContext("2d").drawImage(bitmap,0,0,canvas.width,canvas.height);
+      const source=canvas.toDataURL("image/webp", Math.max(.4,.85-attempt*.1));
+      if(source.length <= 80000) return source;
+      scale*=.8;
+    }
+    throw new Error("圖片無法壓縮至適合公告的大小，請裁切後再試");
+  } finally { bitmap.close(); }
 }
 
 async function refreshBanner() {

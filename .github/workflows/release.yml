@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.11.0 >/dev/null 2>&1; then
-            gh release create v0.11.0 --target "$GITHUB_SHA" --title "v0.11.0 部落格式公告編輯工作室" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.12.0 >/dev/null 2>&1; then
+            gh release create v0.12.0 --target "$GITHUB_SHA" --title "v0.12.0 截圖貼上與自動超連結" --notes-file deploy/RELEASE.md
           fi
