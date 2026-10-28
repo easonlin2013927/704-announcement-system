@@ -1,4 +1,4 @@
-import { cloud } from "./cloud.js?v=0.7.1";
+import { cloud } from "./cloud.js?v=0.8.0";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
@@ -133,7 +133,7 @@ function toast(message, tone = "success") {
 function render() {
   if (!state.session) return renderLogin();
   if (state.settingsOpen) return renderSettings();
-  if (state.adminView === "accounts" && state.session.role === "admin") return renderAccounts();
+  if (state.adminView === "accounts" && ["admin","teacher"].includes(state.session.role)) return renderAccounts();
   if (state.editingId !== null) return renderEditor();
   if (state.selectedId) return renderDetail();
   return renderDashboard();
@@ -154,11 +154,11 @@ function renderLogin() {
           <h2>${portal.title}</h2>
           <p class="muted">${portal.description}</p>
           <form id="login-form">
-            <label>帳號<input name="account" autocomplete="username" placeholder="${activeRole === "admin" ? "請輸入維護帳號" : "請輸入電子郵件"}" type="${activeRole === "admin" ? "text" : "email"}" required></label>
-            <label>密碼<input name="password" type="password" autocomplete="current-password" placeholder="請輸入密碼" required></label>
+            <label>帳號<input name="account" autocomplete="username" placeholder="請輸入帳號" type="text" required></label>
+            <label>密碼<input name="password" type="password" autocomplete="current-password" placeholder="請輸入密碼"></label>
             <button class="primary-button wide" type="submit">登入系統 ${icon("arrow", 18)}</button>
           </form>
-          <p class="helper">${activeRole === "admin" ? "使用維護人員專用帳號登入。" : "使用管理員提供的電子郵件與密碼登入。公告儲存於雲端。"}</p>
+          <p class="helper">${activeRole === "admin" ? "使用維護人員專用帳號登入。" : "使用教師或管理員提供的帳號登入。公告儲存於雲端。"}</p>
         </div>
       </section>
       </div><footer class="login-footnote">704 ANNOUNCEMENT SYSTEM <span>讓每一則消息，清楚抵達。</span></footer>
@@ -192,7 +192,7 @@ function headerTemplate() {
         <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
         <span class="role-chip">${portals[state.session.role].label}端</span>
         <div class="user-block"><span class="avatar">${escapeHtml(state.session.name.charAt(0))}</span><span><strong>${escapeHtml(state.session.name)}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
-${state.session.role === "admin" ? '<button class="secondary-button" id="open-accounts">帳號管理</button>' : ""}
+${["admin","teacher"].includes(state.session.role) ? `<button class="secondary-button" id="open-accounts">${state.session.role==="teacher"?"學生帳號":"帳號管理"}</button>` : ""}
 <button class="secondary-button" id="open-settings">設定</button>
         <button class="icon-button" id="logout" title="登出">${icon("logout")}</button>
       </nav>
@@ -223,15 +223,16 @@ function renderMaintenance() {
 }
 
 function renderAccounts() {
+  const isAdmin=state.session.role==="admin";
   app.innerHTML = `${headerTemplate()}<main class="editor-shell">
     <button class="back-button" id="accounts-back">${icon("back",18)} 返回管理首頁</button>
-    <div class="editor-heading"><span class="eyebrow dark">ACCOUNT ADMINISTRATION</span><h1>帳號管理</h1><p>建立學生、教師與管理員帳號；教師與學生使用電子郵件登入，管理員可使用不含 @ 的維護帳號。</p></div>
-    <button class="primary-button" id="create-person">建立人員</button><dialog id="person-dialog" class="form-dialog"><button class="back-button" id="close-person" type="button">關閉</button><form class="editor-card" id="account-form"><h2>新增帳號</h2><div class="form-grid">
-      <label>登入帳號<input name="email" required maxlength="254" placeholder="學生／教師輸入電子郵件；管理員可用維護帳號"></label>
-      <label>顯示姓名<input name="name" required maxlength="80"></label>
-      <label>角色<select name="role"><option value="student">學生</option><option value="teacher">教師</option><option value="admin">管理員</option></select></label>
-      <label>初始密碼<input name="password" required minlength="10" maxlength="512" type="password" autocomplete="new-password"></label>
-    </div><footer class="editor-footer"><span>密碼至少 10 字元，請安全地將登入資料交給本人。</span><button class="primary-button">建立帳號</button></footer></form></dialog>
+    <div class="editor-heading"><span class="eyebrow dark">ACCOUNT ADMINISTRATION</span><h1>${isAdmin?"帳號管理":"學生帳號"}</h1><p>${isAdmin?"建立學生、教師與管理員帳號。":"建立學生帳號，提供學生登入使用。"}登入帳號可使用一般名稱，不限定電子郵件格式。</p></div>
+    <button class="primary-button" id="create-person">${isAdmin?"建立人員":"建立學生"}</button><dialog id="person-dialog" class="form-dialog"><button class="back-button" id="close-person" type="button">關閉</button><form class="editor-card" id="account-form"><h2>新增帳號</h2><div class="form-grid">
+      <label>登入帳號<input name="email" required placeholder="請輸入登入帳號"></label>
+      <label>顯示姓名<input name="name" placeholder="未填寫時使用登入帳號"></label>
+      ${isAdmin?'<label>角色<select name="role"><option value="student">學生</option><option value="teacher">教師</option><option value="admin">管理員</option></select></label>':'<input type="hidden" name="role" value="student"><p>角色：學生</p>'}
+      <label>初始密碼<input name="password" type="password" autocomplete="new-password"></label>
+    </div><footer class="editor-footer"><span>請將登入資料交給帳號本人。</span><button class="primary-button">建立帳號</button></footer></form></dialog>
     <section class="editor-card"><h2>現有帳號</h2><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section>
   </main>`;
   bindHeader();
@@ -240,7 +241,7 @@ function renderAccounts() {
   document.querySelector("#create-person").addEventListener("click",()=>personDialog.showModal());
   document.querySelector("#close-person").addEventListener("click",()=>personDialog.close());
   const message=document.querySelector("#accounts-message"), list=document.querySelector("#accounts-list");
-  const refresh=async()=>{ try { state.accounts=await cloud.accounts(); list.innerHTML=state.accounts.map(account=>`<div class="account-row" data-account="${account.id}"><strong>${escapeHtml(account.display_name)}</strong><span>${escapeHtml(account.email)}</span><select aria-label="${escapeHtml(account.display_name)}角色"><option value="student" ${account.role==="student"?"selected":""}>學生</option><option value="teacher" ${account.role==="teacher"?"selected":""}>教師</option><option value="admin" ${account.role==="admin"?"selected":""}>管理員</option></select><button class="danger-button" data-remove-account="${account.id}">刪除</button></div>`).join("")||"<p>尚無帳號。</p>"; message.textContent=""; } catch(error){message.textContent=error.message;} };
+  const refresh=async()=>{ try { state.accounts=await cloud.accounts(); list.innerHTML=state.accounts.map(account=>`<div class="account-row" data-account="${account.id}"><strong>${escapeHtml(account.display_name)}</strong><span>${escapeHtml(account.email)}</span>${isAdmin?`<select aria-label="${escapeHtml(account.display_name)}角色"><option value="student" ${account.role==="student"?"selected":""}>學生</option><option value="teacher" ${account.role==="teacher"?"selected":""}>教師</option><option value="admin" ${account.role==="admin"?"selected":""}>管理員</option></select><button class="danger-button" data-remove-account="${account.id}">刪除</button>`:'<span class="role-chip">學生</span>'}</div>`).join("")||"<p>尚無帳號。</p>"; message.textContent=""; } catch(error){message.textContent=error.message;} };
   document.querySelector("#account-form").addEventListener("submit",async event=>{event.preventDefault();const form=event.currentTarget,button=form.querySelector(".primary-button");const data=Object.fromEntries(new FormData(form));button.disabled=true;try{await cloud.createAccount(data);form.reset();personDialog.close();toast("帳號已建立");await refresh();}catch(error){toast(error.message,"error");}finally{button.disabled=false;}});
   list.addEventListener("change",async event=>{if(!event.target.matches("select"))return;const row=event.target.closest("[data-account]");const account=state.accounts.find(item=>item.id===row.dataset.account);try{await cloud.updateAccount(account.id,{name:account.display_name,role:event.target.value});toast("角色已更新");await refresh();}catch(error){toast(error.message,"error");await refresh();}});
   list.addEventListener("click",async event=>{const button=event.target.closest("[data-remove-account]");if(!button)return;const account=state.accounts.find(item=>item.id===button.dataset.removeAccount);if(!window.confirm(`確定刪除帳號「${account.display_name}」？`))return;try{await cloud.deleteAccount(account.id);toast("帳號已刪除");await refresh();}catch(error){toast(error.message,"error");}});

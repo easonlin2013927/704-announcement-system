@@ -36,7 +36,7 @@ const server = createServer(async (req,res) => {
  if (path === "/login" && req.method === "POST") {
  const data = await body(req);
  const email = typeof data.email === "string" ? data.email.trim().toLowerCase() : "";
- if (!email || typeof data.password !== "string" || data.password.length > 512) fail(400,"請輸入有效帳號密碼");
+ if (!email || typeof data.password !== "string") fail(400,"請輸入有效帳號密碼");
  const record = attempts.get(email);
  if (record && record.until > Date.now() && record.count >= 8) fail(429,"登入次數過多，請十五分鐘後再試");
  const account = (await db.query("select * from accounts704 where email=$1",[email])).rows[0];
@@ -71,12 +71,13 @@ const server = createServer(async (req,res) => {
  return send(200,result.rows[0]);
  }
  if (path === "/admin/accounts" && ["GET","POST"].includes(req.method)) {
- if(user.role!=="admin") fail(403,"僅限管理員管理帳號");
- if(req.method==="GET") return send(200,(await db.query("select id,email,display_name,role from accounts704 order by role,display_name")).rows);
+ if(!["admin","teacher"].includes(user.role)) fail(403,"僅限教師或管理員建立帳號");
+ if(req.method==="GET") return send(200,(await db.query(user.role==="teacher" ? "select id,email,display_name,role from accounts704 where role='student' order by display_name" : "select id,email,display_name,role from accounts704 order by role,display_name")).rows);
  const value=await body(req);
  const email=typeof value.email==="string"?value.email.trim().toLowerCase():"";
- const name=typeof value.name==="string"?value.name.trim():"";
- if(!email || email.length>254 || (value.role==="admin" ? email.includes("@") : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) || !name || name.length>80 || !["student","teacher","admin"].includes(value.role) || typeof value.password!=="string" || value.password.length<10 || value.password.length>512) fail(400,"請確認帳號、姓名、角色與密碼（至少 10 字）");
+ const name=typeof value.name==="string"&&value.name.trim()?value.name.trim():email;
+ if(user.role==="teacher" && value.role!=="student") fail(403,"教師只能建立學生帳號");
+ if(!email || !["student","teacher","admin"].includes(value.role) || typeof value.password!=="string") fail(400,"請填寫登入帳號並選擇角色");
  const result=await db.query("insert into accounts704(id,email,display_name,role,password_hash) values($1,$2,$3,$4,$5) on conflict(email) do nothing returning id,email,display_name,role",[randomUUID(),email,name,value.role,await hash(value.password)]);
  if(!result.rowCount) fail(409,"此帳號已存在");
  return send(201,result.rows[0]);
@@ -88,7 +89,7 @@ const server = createServer(async (req,res) => {
  if(!target) fail(404,"找不到帳號");
  if(req.method==="PATCH") {
  const value=await body(req); const name=typeof value.name==="string"?value.name.trim():"";
- if(!name || name.length>80 || !["student","teacher","admin"].includes(value.role)) fail(400,"姓名或角色格式錯誤");
+ if(!name || !["student","teacher","admin"].includes(value.role)) fail(400,"姓名或角色格式錯誤");
  if(target.id===user.id && value.role!=="admin") fail(400,"不能移除自己最後的管理員身分");
  if(target.role==="admin" && value.role!=="admin" && Number((await db.query("select count(*)::int as total from accounts704 where role='admin'")).rows[0].total)<=1) fail(400,"至少需保留一位管理員");
  const result=await db.query("update accounts704 set display_name=$1,role=$2 where id=$3 returning id,email,display_name,role",[name,value.role,target.id]);
