@@ -16,9 +16,9 @@ async function request(path, options = {}) {
   return data;
 }
 export const cloud = {
-  async login(email, password) {
+  async login(email, password, portal) {
     token = null;
-    const result = await request("/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    const result = await request("/login", { method: "POST", body: JSON.stringify({ email, password, portal }) });
     token = result.token;
     return result.profile;
   },
@@ -39,4 +39,5 @@ export const cloud = {
   async remove(id) {
     await request("/announcements/" + encodeURIComponent(id), { method: "DELETE" });
   },
+  status() { return request("/admin/status"); },
 };

@@ -1,4 +1,15 @@
 import { cloud } from "./cloud.js";
+import { portals, portalRole } from "./portal.js";
+
+let activeRole = portalRole(location.hash);
+window.addEventListener("hashchange", () => {
+  cloud.logout();
+  state.session = null;
+  state.selectedId = null;
+  state.editingId = null;
+  activeRole = portalRole(location.hash);
+  render();
+});
 
 const categories = {
   important: { label: "重要通知", tone: "rose" },
@@ -112,12 +123,15 @@ function toast(message, tone = "success") {
 
 function render() {
   if (!state.session) return renderLogin();
+  if (state.session.role === "admin") return renderMaintenance();
   if (state.editingId !== null) return renderEditor();
   if (state.selectedId) return renderDetail();
   return renderDashboard();
 }
 
 function renderLogin() {
+  const portal = portals[activeRole];
+  document.title = portal.title + "｜704公告系統";
   app.innerHTML = `
     <main class="login-shell">
       <section class="login-brand">
@@ -132,31 +146,18 @@ function renderLogin() {
       <section class="login-panel">
         <div class="login-card">
           <div class="mobile-logo"><div class="brand-mark">知</div><strong>704公告系統</strong></div>
-          <span class="eyebrow dark">WELCOME BACK</span>
-          <h2>登入校園公告</h2>
-          <p class="muted">選擇身分，進入你的專屬公告空間。</p>
-          <div class="role-tabs" role="tablist" aria-label="登入身分">
-            <button class="role-tab active" data-role="student">學生</button>
-            <button class="role-tab" data-role="teacher">教師</button>
-          </div>
+          <span class="eyebrow dark">${portal.eyebrow}</span>
+          <h2>${portal.title}</h2>
+          <p class="muted">${portal.description}</p>
           <form id="login-form">
-            <input type="hidden" name="role" value="student">
-            <label>帳號<input name="account" autocomplete="username" placeholder="請輸入電子郵件" type="email" required></label>
+            <label>帳號<input name="account" autocomplete="username" placeholder="${activeRole === "admin" ? "請輸入維護帳號" : "請輸入電子郵件"}" type="${activeRole === "admin" ? "text" : "email"}" required></label>
             <label>密碼<input name="password" type="password" autocomplete="current-password" placeholder="請輸入密碼" required></label>
             <button class="primary-button wide" type="submit">登入系統 ${icon("arrow", 18)}</button>
           </form>
-          <p class="helper">使用管理員提供的電子郵件與密碼登入。公告儲存於雲端。</p>
+          <p class="helper">${activeRole === "admin" ? "使用維護人員專用帳號登入。" : "使用管理員提供的電子郵件與密碼登入。公告儲存於雲端。"}</p>
         </div>
       </section>
     </main>`;
-
-  document.querySelectorAll(".role-tab").forEach((button) => {
-    button.addEventListener("click", () => {
-      document.querySelectorAll(".role-tab").forEach((el) => el.classList.remove("active"));
-      button.classList.add("active");
-      document.querySelector('[name="role"]').value = button.dataset.role;
-    });
-  });
 
   document.querySelector("#login-form").addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -164,9 +165,9 @@ function renderLogin() {
     const button = event.currentTarget.querySelector('[type="submit"]');
     button.disabled = true;
     try {
-      const profile = await cloud.login(data.get("account"), data.get("password"));
-      if (profile.role !== data.get("role")) throw new Error("選擇的身分與帳號不符，請切換正確身分。");
-      state.announcements = await cloud.list();
+      const profile = await cloud.login(data.get("account"), data.get("password"), activeRole);
+      if (profile.role !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
+      if (activeRole !== "admin") state.announcements = await cloud.list();
       state.session = { ...profile, name: profile.display_name };
       state.selectedId = null;
       state.editingId = null;
@@ -182,11 +183,34 @@ function headerTemplate() {
     <header class="topbar">
       <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>校園公告</small></span></button>
       <nav class="top-actions">
-        <span class="role-chip">${isTeacher ? "教師端" : "學生端"}</span>
+        <span class="role-chip">${portals[state.session.role].label}端</span>
         <div class="user-block"><span class="avatar">${isTeacher ? "林" : "陳"}</span><span><strong>${escapeHtml(state.session.name)}</strong><small>${isTeacher ? "公告管理" : "704"}</small></span></div>
         <button class="icon-button" id="logout" title="登出">${icon("logout")}</button>
       </nav>
     </header>`;
+}
+
+function renderMaintenance() {
+  document.title = "系統維護｜704公告系統";
+  app.innerHTML = `${headerTemplate()}<main class="page-shell">
+    <section class="hero-row"><div><span class="eyebrow dark">MAINTENANCE CONSOLE</span>
+    <h1>系統維護</h1><p>此入口用於查看服務狀態；公告內容由教師端管理。</p></div></section>
+    <section class="article-paper"><h2>服務狀態</h2><p id="maintenance-status" aria-live="polite">正在檢查…</p>
+    <button class="secondary-button" id="refresh-status">重新檢查</button>
+    <p class="muted">帳號建立、角色調整與資料庫備份目前由主機端工具執行。</p></section></main>`;
+  bindHeader();
+  const status = document.querySelector("#maintenance-status");
+  const refresh = document.querySelector("#refresh-status");
+  const check = async () => {
+    refresh.disabled = true;
+    try {
+      const result = await cloud.status();
+      status.textContent = `API 與資料庫正常；目前共有 ${result.announcements} 則公告。`;
+    } catch (error) { status.textContent = error.message; }
+    finally { refresh.disabled = false; }
+  };
+  refresh.addEventListener("click", check);
+  check();
 }
 
 function bindHeader() {

@@ -39,6 +39,7 @@ const server = createServer(async (req,res) => {
  fail(401,"帳號或密碼錯誤");
  }
  attempts.delete(email);
+ if (!["teacher","student","admin"].includes(data.portal) || data.portal !== account.role) fail(403,"帳號不屬於此登入入口");
  const token = randomBytes(32).toString("hex");
  await db.query("insert into sessions704 values($1,$2,now()+interval '8 hours')",[digest(token),account.id]);
  return send(200,{token,profile:{role:account.role,display_name:account.display_name}});
@@ -47,6 +48,11 @@ const server = createServer(async (req,res) => {
  const user = (await db.query("select a.id,a.role,a.display_name from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now()",[digest(token)])).rows[0];
  if (!user) fail(401,"登入已失效，請重新登入");
  if (path === "/logout" && req.method === "POST") { await db.query("delete from sessions704 where token_hash=$1",[digest(token)]); return send(200,{ok:true}); }
+ if (path === "/admin/status" && req.method === "GET") {
+ if (user.role !== "admin") fail(403,"僅限維護人員");
+ const result = await db.query("select count(*)::int as total from announcements704");
+ return send(200,{status:"ok",announcements:result.rows[0].total});
+ }
  if (path === "/announcements" && req.method === "GET") return send(200,(await db.query("select * from announcements704 order by pinned desc,date desc")).rows);
  if (user.role !== "teacher") fail(403,"僅限教師管理公告");
  const match = path.match(/^\/announcements\/([0-9a-f-]{36})$/i);

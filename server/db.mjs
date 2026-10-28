@@ -4,11 +4,16 @@ db.on("error", () => console.error("Database connection interrupted"));
 export async function migrate() {
  await db.query(`create table if not exists accounts704 (
  id uuid primary key, email text unique not null, display_name text not null,
- role text not null check(role in ('teacher','student')), password_hash text not null);
+ role text not null check(role in ('teacher','student','admin')), password_hash text not null);
  create table if not exists announcements704 (
  id uuid primary key, title text not null, category text not null, author text not null,
  audience text not null, date timestamptz not null default now(), pinned boolean not null default false, content text not null);
  create table if not exists sessions704 (
  token_hash text primary key, account_id uuid not null references accounts704(id) on delete cascade,
  expires_at timestamptz not null);`);
+ // Atomic constraint migration preserves existing accounts and announcements.
+ await db.query(`begin;
+ alter table accounts704 drop constraint if exists accounts704_role_check;
+ alter table accounts704 add constraint accounts704_role_check check (role in ('teacher','student','admin'));
+ commit;`);
 }

@@ -1,6 +1,6 @@
 # 1Panel 部署（自架 PostgreSQL）
 
-此版本正在準備部署，尚未連接正式資料庫。cloudflared 直接運行在同一台主機時適用下列步驟。
+cloudflared 直接運行在同一台主機時適用下列步驟。0.3.0 將登入分成學生、教師與維護人員三個入口；前端與後端必須一起升級。
 
 ## 1. 準備原始碼
 
@@ -47,7 +47,7 @@ curl http://127.0.0.1:7040/health
 docker exec -i api704 node account.mjs < accounts.json
 ```
 
-成功顯示 Account saved 後，刪除這個含明文密碼的暫存檔。學生帳號使用 role: student，逐一建立。勿將 accounts.json 放進 repository 或分享。相同 email 會更新密碼、名稱與角色，並撤銷舊登入。
+成功顯示 Account saved 後，刪除這個含明文密碼的暫存檔。學生帳號使用 role: student，維護人員帳號使用 role: admin，逐一建立。勿將 accounts.json 放進 repository 或分享。相同 email 會更新密碼、名稱與角色，並撤銷舊登入。
 
 ## 5. Cloudflare Tunnel
 

@@ -1,54 +1,49 @@
 # 704公告系統
 
-> 自架版本 0.2.0 部署準備中：目前前端已改接自架 API，不再使用 Supabase。請以 [1Panel 部署手冊](deploy/README.md) 為準；下方舊 Supabase 設定僅供歷史參考。API 尚未在正式主機啟動，請先完成健康檢查與教師／學生驗收。尚不支援任意自訂頁面或區塊。
+教師發布富文字公告，學生登入閱讀；前端使用 GitHub Pages，後端為自架 Node.js API 與 PostgreSQL，透過 Cloudflare Tunnel 提供 HTTPS。
 
-提供教師發布富文字公告、學生登入閱讀的響應式校園公告網站。前端託管於 GitHub Pages，公告與角色權限由 Supabase 集中管理。
+## 獨立登入入口
+
+| 身分 | 登入連結 | 功能 |
+| --- | --- | --- |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/#/admin/login) | 查看 API、資料庫狀態與公告數量 |
+
+三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
+
+管理員不是教師帳號，維護端不提供公告寫入功能。帳號建立、角色調整、密碼重設與備份目前使用主機端工具。尚未配發正式帳號，請先聯絡管理員建立。
 
 ## 操作文件
 
-- [學生使用手冊](https://github.com/easonlin2013927/704-announcement-system/wiki/Student%E2%80%90Guide)：登入、閱讀、搜尋與常見問題，不包含教師操作。
-- [教師使用手冊](https://github.com/easonlin2013927/704-announcement-system/wiki/Teacher%E2%80%90Guide)：發布、格式設定、置頂、編輯與刪除。
-- [完整使用中心](docs/wiki/Home.md)
-- [管理員設定與維護](docs/wiki/Administrator-Setup.md)
+- [學生使用手冊](docs/wiki/Student-Guide.md)
+- [教師使用手冊](docs/wiki/Teacher-Guide.md)
+- [維護人員使用說明](docs/wiki/Maintenance-Guide.md)
+- [1Panel 部署與帳號設定](deploy/README.md)
+- [既有 Wiki](https://github.com/easonlin2013927/704-announcement-system/wiki)
 
-原生 GitHub Wiki 已發布首頁、學生、教師與管理員手冊。全文來源另保存在 docs/wiki，方便維護與備份。
+主 repository 文件與目前版本同步。既有 Wiki 可能仍有前版登入步驟，請以上述對應文件為準。
 
-## 目前狀態
+## 功能與資料保留
 
-已完成前端與 Supabase API／權限 SQL。尚未建立或連接實際 Supabase 專案，因此目前不能以真實帳號登入與發布；不是已上線的資料庫服務。
+支援粗體、斜體、底線、螢光筆、標題、引用、清單與連結。公告集中存於 PostgreSQL，沒有到期自動刪除；清除瀏覽器資料與重新部署前端不會刪除公告。教師可共同管理公告。
 
-## 功能
+前端不使用 localStorage、sessionStorage 或 IndexedDB 儲存公告或登入憑證，登入只存在記憶體，重新整理需再次登入。沒有草稿、回收桶、附件與即時通知。資料庫仍需由維護人員定期備份。
 
-- 電子郵件與密碼登入，角色由資料庫決定
-- 粗體、斜體、底線、螢光筆、標題、引用、清單與連結
-- 公告搜尋、分類、置頂、全文閱讀、修改與刪除
-- 學生唯讀、教師共同管理公告的資料庫權限
-- 雲端儲存，沒有自動過期或定期刪除
-- 不使用 localStorage、sessionStorage 或 IndexedDB 儲存公告或登入憑證
-- GitHub Actions 靜態建置部署
+## 開發與部署
 
-登入只保留於記憶體，重新整理需重新登入；目前沒有即時推播、草稿、附件、版本紀錄與回收桶。公告對象是標籤，不是閱讀權限。
+前端使用 Node.js 22，無第三方套件依賴：
 
-## 本機建置
-
-需要 Node.js 22，無第三方套件依賴。
-
-```bash
+```sh
 npm run check
 npm run build
 node scripts/serve.mjs
 ```
 
-開啟 http://127.0.0.1:4173 。正式資料庫設定請參照管理員手冊，執行 supabase/schema.sql 並填寫 src/config.js 的公開專案設定。不要提交管理金鑰或密碼。
+後端需安裝 server/package.json 的 pg 依賴。部署方式與主機環境變數見 deploy/README.md；不要執行舊 supabase/schema.sql。升級時必須同時更新前端與後端。
 
-## 部署
-
-將 main 推送後，在 repository 的 Settings → Pages 選擇 GitHub Actions。部署設定為 .github/workflows/deploy.yml。私人 repository 能否使用 Pages 與 Wiki 取決於帳號方案。
+目前 API 與 Tunnel 已啟動，前版教師／學生權限已在主機實測。0.3.0 新增 admin 角色，升級會原子更新帳號角色約束，保留原有資料。
 
 ## 問題與建議
 
-在 Issues → New issue 選擇「問題回報」「使用請教」或「網站建議」。提交前先閱讀對應手冊，避免附上密碼、學號、學生個資或完整名冊。
-
-## 資料保留
-
-公告不會因關閉瀏覽器、清除快取或重新部署而刪除。直到教師明確刪除前，系統不設定到期清除。資料庫服務維護、備份及復原仍由管理員負責，無法保證外部服務永不中斷。
+[Issues 選單](https://github.com/easonlin2013927/704-announcement-system/issues/new/choose) 提供問題回報、使用請教及網站建議。請勿提交密碼、學生個資或名冊。

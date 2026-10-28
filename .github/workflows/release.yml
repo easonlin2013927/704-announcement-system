@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.2.0-rc.1 >/dev/null 2>&1; then
-            gh release create v0.2.0-rc.1 --target "$GITHUB_SHA" --prerelease --title "v0.2.0-rc.1 自架 PostgreSQL 部署預覽" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.3.0 >/dev/null 2>&1; then
+            gh release create v0.3.0 --target "$GITHUB_SHA" --title "v0.3.0 三種獨立登入入口" --notes-file deploy/RELEASE.md
           fi
