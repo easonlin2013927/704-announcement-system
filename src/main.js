@@ -198,7 +198,7 @@ function headerTemplate() {
   const isTeacher = state.session.role === "teacher";
   return `
     <header class="topbar">
-      <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>${state.session.role === "student" ? "班級公告" : "校園公告"}</small></span></button>
+      <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>班級公告</small></span></button>
       <nav class="top-actions">
         <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-announcement-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
         <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
@@ -418,19 +418,28 @@ function renderDetail() {
 function renderEditor() {
   const existing = state.editingId === "new" ? null : state.announcements.find((item) => item.id === state.editingId);
   const canManageComments=!existing||state.session.role==="admin"||existing.author_id===state.session.id;
-  app.innerHTML = `${headerTemplate()}<main class="editor-shell">
+  app.innerHTML = `${headerTemplate()}<main class="editor-shell blog-studio">
     <button class="back-button" id="cancel-edit">${icon("back", 18)} 取消並返回</button>
-    <div class="editor-heading"><div><span class="eyebrow dark">RICH TEXT EDITOR</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>運用清楚的層次與重點標示，讓學生快速掌握資訊。</p></div></div>
-    <form id="editor-form" class="editor-card">
+    <div class="editor-heading studio-heading"><div><span class="eyebrow dark">704 · PUBLISHING STUDIO</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>寫下班級的新消息，讓重要的事被看見。</p></div><button type="button" class="secondary-button" id="focus-writing" aria-pressed="false">專注寫作</button></div>
+    <form id="editor-form" class="editor-card studio-form">
+      <div class="studio-workspace">
+      <section class="studio-document" aria-label="文章編輯區">
+        <label class="studio-title-label">公告標題<input class="studio-title" name="title" maxlength="80" value="${escapeHtml(existing?.title || "")}" placeholder="為這則消息取個標題…" required></label>
+        <div class="studio-tabs" role="tablist" aria-label="文章顯示模式"><button type="button" role="tab" id="write-tab" aria-selected="true" aria-controls="studio-write">撰寫</button><button type="button" role="tab" id="preview-tab" aria-selected="false" aria-controls="studio-preview">閱讀預覽</button><span id="writing-stats" aria-live="polite"></span></div>
+        <div id="studio-write" role="tabpanel" aria-labelledby="write-tab"><label class="editor-label">公告內容</label>${editorMarkup(existing?.content || "")}</div>
+        <article id="studio-preview" class="studio-preview" role="tabpanel" aria-labelledby="preview-tab" hidden><p class="eyebrow dark">閱讀預覽 · 尚未發布</p><h1 id="preview-title"></h1><p id="preview-meta" class="muted"></p><div id="preview-body" class="rich-content"></div></article>
+      </section>
+      <aside class="studio-sidebar" aria-label="發布設定">
+      <div class="studio-panel"><h2>發布設定</h2><p class="muted">${existing ? "儲存後會更新現有公告。" : "確認內容與對象後，即可發布。"}</p>
       <div class="form-grid">
-        <label class="span-2">公告標題<input name="title" maxlength="80" value="${escapeHtml(existing?.title || "")}" placeholder="輸入清楚明確的公告標題" required></label>
         <label>公告分類<select name="category">${Object.entries(categories).map(([key, category]) => `<option value="${key}" ${existing?.category === key ? "selected" : ""}>${category.label}</option>`).join("")}</select></label>
         <label>公告對象<select name="audience">${["學生", "教師", "全部人員"].map((value) => `<option ${(existing?.audience || "學生") === value ? "selected" : ""}>${value}</option>`).join("")}</select></label>
       </div>
-      <label class="editor-label">公告內容</label>
-      ${editorMarkup(existing?.content || "")}
       <div class="editor-options"><label class="switch-row"><input type="checkbox" name="pinned" ${existing?.pinned ? "checked" : ""}><span class="switch"></span><span><strong>置頂公告</strong><small>讓這則公告優先顯示在列表最上方</small></span></label></div>
       ${canManageComments?`<label class="check-option"><input type="checkbox" name="comments_enabled" ${existing?.comments_enabled?"checked":""}>開啟評論區</label>`:'<p class="muted">評論區開關由公告張貼者或管理員設定。</p>'}
+      <button class="primary-button studio-publish" type="submit">${existing ? "儲存變更" : "發布公告"}</button><p class="studio-save-note">內容在按下${existing ? "儲存" : "發布"}後才會保存至雲端。</p></div>
+      <div class="studio-panel"><h2>文章概覽</h2><p id="article-summary" class="muted"></p><h3>文章大綱</h3><ul id="article-outline" class="studio-outline"></ul></div>
+      </aside></div>
       <footer class="editor-footer"><span>${icon("spark", 17)} 提示：善用螢光筆標示日期與重要事項</span><div><button type="button" class="secondary-button" id="cancel-edit-bottom">取消</button><button class="primary-button" type="submit">${existing ? "儲存變更" : "發布公告"}</button></div></footer>
     </form>
   </main>`;
@@ -439,6 +448,34 @@ function renderEditor() {
   document.querySelector("#cancel-edit").addEventListener("click", cancel);
   document.querySelector("#cancel-edit-bottom").addEventListener("click", cancel);
   const editor = bindRichEditor();
+  const form = document.querySelector("#editor-form");
+  const updateWriting = () => {
+    const text = stripHtml(editor.innerHTML).trim();
+    const count = Array.from(text.replace(/\s/g, "")).length;
+    document.querySelector("#writing-stats").textContent = `${count} 字 · 約 ${Math.max(1, Math.ceil(count / 350))} 分鐘閱讀`;
+    document.querySelector("#article-summary").textContent = text ? `${text.slice(0, 120)}${text.length > 120 ? "…" : ""}` : "輸入內容後，這裡會自動產生文章摘要。";
+    document.querySelector("#article-outline").innerHTML = Array.from(editor.querySelectorAll("h2,h3")).map(h => `<li class="${h.tagName === "H3" ? "outline-sub" : ""}">${escapeHtml(h.textContent)}</li>`).join("") || '<li class="muted">使用段落格式加入標題，即可建立大綱。</li>';
+    document.querySelector("#preview-title").textContent = form.elements.title.value.trim() || "未命名公告";
+    document.querySelector("#preview-meta").textContent = `${identityName(state.session.name,state.session.nickname)} · ${categories[form.elements.category.value].label} · ${form.elements.audience.value}`;
+    document.querySelector("#preview-body").innerHTML = sanitizeHtml(editor.innerHTML) || '<p class="muted">尚未輸入內容。</p>';
+  };
+  form.addEventListener("input", updateWriting);
+  form.addEventListener("change", updateWriting);
+  const setWritingMode = preview => {
+    updateWriting();
+    document.querySelector("#studio-write").hidden = preview;
+    document.querySelector("#studio-preview").hidden = !preview;
+    document.querySelector("#write-tab").setAttribute("aria-selected", String(!preview));
+    document.querySelector("#preview-tab").setAttribute("aria-selected", String(preview));
+  };
+  document.querySelector("#write-tab").addEventListener("click", () => setWritingMode(false));
+  document.querySelector("#preview-tab").addEventListener("click", () => setWritingMode(true));
+  document.querySelector("#focus-writing").addEventListener("click", event => {
+    const focused = document.querySelector(".blog-studio").classList.toggle("studio-focused");
+    event.currentTarget.setAttribute("aria-pressed", String(focused));
+    event.currentTarget.textContent = focused ? "顯示發布設定" : "專注寫作";
+  });
+  updateWriting();
   document.querySelector("#editor-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -449,10 +486,12 @@ function renderEditor() {
       date: existing?.date || new Date().toISOString(), pinned: data.get("pinned") === "on", content: sanitizeHtml(editor.innerHTML),
     };
     if(canManageComments)announcement.comments_enabled=data.get("comments_enabled")==="on";
+    const publishButtons = form.querySelectorAll('[type="submit"]');
+    publishButtons.forEach(button => button.disabled = true);
     try {
       await cloud.save(announcement, Boolean(existing));
       state.announcements=await cloud.list();
-    } catch (error) { toast(error.message, "error"); return; }
+    } catch (error) { toast(error.message, "error"); publishButtons.forEach(button => button.disabled = false); return; }
     state.editingId = null; render(); toast(existing ? "公告已更新" : "公告已發布");
   });
 }
@@ -468,12 +507,13 @@ async function deleteAnnouncement(id) {
 function editorMarkup(content = "") {
   return `      <div class="rich-editor-wrap">
         <div class="format-toolbar" role="toolbar" aria-label="文字格式">
+          <button type="button" data-command="undo" title="復原" aria-label="復原">↶</button><button type="button" data-command="redo" title="重做" aria-label="重做">↷</button><span class="divider"></span>
           <button type="button" data-command="bold" title="粗體">${icon("bold", 18)}</button><button type="button" data-command="italic" title="斜體">${icon("italic", 18)}</button><button type="button" data-command="underline" title="底線">${icon("underline", 18)}</button><span class="divider"></span>
           <button type="button" data-command="insertUnorderedList" title="項目符號">${icon("list", 18)}</button><button type="button" data-command="insertOrderedList" title="編號清單">${icon("ordered", 18)}</button><button type="button" id="add-link" title="插入連結">${icon("link", 18)}</button><span class="divider"></span>
           <button type="button" id="apply-highlight" title="螢光筆"><span class="highlight-icon">A</span></button><label class="color-tool" title="螢光筆顏色"><input type="color" id="highlight-color" aria-label="螢光筆顏色" value="#fef08a"></label>
           <select id="block-format" aria-label="段落格式"><option value="p">一般文字</option><option value="h2">大標題</option><option value="h3">小標題</option><option value="blockquote">引用文字</option></select>
         </div>
-        <div id="rich-editor" class="rich-editor" contenteditable="true" data-placeholder="在這裡輸入公告內容…">${sanitizeHtml(content)}</div>
+        <div id="rich-editor" class="rich-editor" contenteditable="true" role="textbox" aria-label="富文字內容" aria-multiline="true" data-placeholder="在這裡輸入公告內容…">${sanitizeHtml(content)}</div>
       </div>`;
 }
 

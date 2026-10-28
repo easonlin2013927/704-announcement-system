@@ -57,3 +57,43 @@ input,select,textarea,.editor-card textarea,.rich-editor,.format-toolbar,.editor
 .status-table tbody th,.status-table caption,.check-option { color:var(--muted)!important; }
 .topbar { min-height:76px; height:auto!important; padding-top:12px; padding-bottom:12px; gap:14px; flex-wrap:wrap; }
 .login-masthead .repo-button { color:var(--accent); font-size:12px; }
+
+.blog-studio { max-width:1440px; }
+.studio-heading { display:flex; justify-content:space-between; align-items:center; gap:20px; }
+.studio-form { padding:0!important; background:transparent!important; border:0!important; box-shadow:none!important; }
+.studio-workspace { display:grid; grid-template-columns:minmax(0,1fr) 310px; gap:24px; align-items:start; }
+.studio-document,.studio-panel { background:var(--surface); border:1px solid var(--line); border-radius:20px; }
+.studio-document { padding:32px; min-width:0; }
+.studio-title-label { display:block; color:var(--muted); font-size:12px; letter-spacing:.05em; }
+.studio-title { width:100%; border:0!important; border-radius:0!important; background:transparent!important; box-shadow:none!important; padding:18px 0!important; font-size:clamp(25px,3vw,40px)!important; line-height:1.35; font-weight:800; color:var(--ink); }
+.studio-title:focus-visible { outline:2px solid var(--accent); outline-offset:6px; }
+.studio-tabs { display:flex; flex-wrap:wrap; align-items:center; gap:8px; border-bottom:1px solid var(--line); padding:12px 0; margin-bottom:24px; }
+.studio-tabs button { cursor:pointer; border:0; border-radius:9px; padding:10px 16px; background:transparent; color:var(--muted); font:inherit; }
+.studio-tabs button[aria-selected="true"] { background:var(--accent); color:white; }
+#writing-stats { color:var(--muted); font-size:12px; margin-left:auto; }
+.studio-document .rich-editor-wrap { border:0; overflow:visible; }
+.studio-document .format-toolbar { position:sticky; top:100px; z-index:2; border:1px solid var(--line); border-radius:12px; background:var(--surface)!important; flex-wrap:wrap; }
+.studio-document .rich-editor { min-height:520px; padding:26px 6px; font-size:17px; line-height:1.95; }
+.studio-sidebar { display:grid; gap:20px; min-width:0; }
+.studio-panel { padding:22px; }
+.studio-panel h2 { font-size:18px; margin:0 0 12px; }
+.studio-panel h3 { font-size:13px; margin:24px 0 10px; }
+.studio-panel p { font-size:13px; line-height:1.7; overflow-wrap:anywhere; }
+.studio-panel .form-grid { grid-template-columns:1fr; gap:18px; }
+.studio-panel .editor-options { padding:20px 0; margin:8px 0; }
+.studio-panel .switch-row { gap:10px; }
+.studio-panel .check-option { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+.studio-panel input[type="checkbox"] { width:18px; height:18px; flex:0 0 auto; }
+.studio-publish { width:100%; justify-content:center; margin-top:18px; }
+.studio-save-note { color:var(--muted); text-align:center; font-size:11px!important; }
+.studio-outline { margin:0; padding-left:18px; font-size:13px; line-height:1.9; overflow-wrap:anywhere; color:var(--ink); }
+.studio-outline .outline-sub { margin-left:14px; }
+.studio-preview { min-height:520px; overflow-wrap:anywhere; }
+.studio-preview h1 { font-size:clamp(28px,4vw,42px); line-height:1.4; margin:24px 0; }
+.studio-preview .rich-content { margin-top:30px; }
+.studio-focused .studio-sidebar { display:none; }
+.studio-focused .studio-workspace { grid-template-columns:minmax(0,1fr); max-width:960px; margin:auto; }
+.studio-form>.editor-footer { gap:18px; flex-wrap:wrap; margin-top:24px; padding:20px 0; }
+[hidden] { display:none!important; }
+@media(max-width:1000px){.studio-workspace{grid-template-columns:1fr;}.studio-sidebar{grid-template-columns:1fr 1fr;}.studio-document .format-toolbar{position:static;}}
+@media(max-width:600px){.studio-document{padding:20px 16px;}.studio-sidebar{grid-template-columns:1fr;}.studio-heading{align-items:flex-start;flex-direction:column;}.studio-document .rich-editor{min-height:400px;}#writing-stats{width:100%;margin:8px 0 0;}.studio-form>.editor-footer>div{display:flex;gap:10px;flex-wrap:wrap;}}
