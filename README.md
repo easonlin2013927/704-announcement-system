@@ -6,9 +6,9 @@
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/#/student/login) | 閱讀、搜尋及分類公告 |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/#/teacher/login) | 發布、編輯、刪除與置頂公告 |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/#/admin/login) | 查看 API、資料庫狀態與公告數量 |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.3.1#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.3.1#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.3.1#/admin/login) | 查看 API、資料庫狀態與公告數量 |
 
 三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
 
@@ -47,3 +47,4 @@ node scripts/serve.mjs
 ## 問題與建議
 
 [Issues 選單](https://github.com/easonlin2013927/704-announcement-system/issues/new/choose) 提供問題回報、使用請教及網站建議。請勿提交密碼、學生個資或名冊。
+
