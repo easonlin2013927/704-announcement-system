@@ -198,7 +198,7 @@ function headerTemplate() {
   const isTeacher = state.session.role === "teacher";
   return `
     <header class="topbar">
-      <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>校園公告</small></span></button>
+      <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>${state.session.role === "student" ? "班級公告" : "校園公告"}</small></span></button>
       <nav class="top-actions">
         <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-announcement-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
         <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>

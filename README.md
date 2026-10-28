@@ -1,6 +1,6 @@
 # 704公告系統
 
-新增[個人化設定](docs/wiki/Personalization.md)：7 種風格、上傳頭像及暱稱，均保存到帳號。公告張貼者或管理員可在公告編輯頁切換評論區；讀者可以留言，顯示頭像與「原名稱（暱稱）」。上方 GitHub 按鈕可直接開啟本專案。
+v0.10.1 起，學生端頁首使用「班級公告」名稱；教師與維護人員仍顯示「校園公告」。新增[個人化設定](docs/wiki/Personalization.md)：7 種風格、上傳頭像及暱稱，均保存到帳號。公告張貼者或管理員可在公告編輯頁切換評論區；讀者可以留言，顯示頭像與「原名稱（暱稱）」。上方 GitHub 按鈕可直接開啟本專案。
 
 管理員除了教師的公告管理、富文字編輯與登入標語設定，還可建立學生／教師／管理員帳號、調整角色、刪除帳號，以及設定所有頁面頂端的跑馬公告。帳號與跑馬公告均儲存在 PostgreSQL；最後一位管理員與目前登入中的管理員帳號受到保護。詳見[管理員手冊](docs/wiki/Maintenance-Guide.md)。
 
@@ -10,9 +10,9 @@
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.0#/student/login) | 閱讀、搜尋及分類公告 |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.0#/teacher/login) | 發布、編輯、刪除與置頂公告 |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.0#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.1#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.1#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.1#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
 
 三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
 
