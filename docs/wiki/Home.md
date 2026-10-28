@@ -1,12 +1,15 @@
 # 704公告系統使用中心
 
+- [個人化設定](Personalization.md)：7 種風格、頭像、暱稱與跨裝置保存。
+- 公告支援可選擇開啟的評論區，留言顯示頭像與原名稱（暱稱）。
+
 ## 各系統登入網址
 
 | 身分 | 登入網址 |
 | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.9.1#/student/login) |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.9.1#/teacher/login) |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.9.1#/admin/login) |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.0#/student/login) |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.0#/teacher/login) |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.0#/admin/login) |
 
 請使用符合帳號角色的入口。三個畫面獨立，切換網址不會取得不同角色權限。
 

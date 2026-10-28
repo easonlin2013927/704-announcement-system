@@ -45,6 +45,11 @@ export const cloud = {
     await request("/announcements/" + encodeURIComponent(id), { method: "DELETE" });
   },
   status() { return request("/admin/status"); },
+  me(){return request("/me");},
+  saveProfile(value){return request("/me",{method:"PATCH",body:JSON.stringify(value)});},
+  comments(id){return request("/announcements/"+encodeURIComponent(id)+"/comments");},
+  addComment(id,content){return request("/announcements/"+encodeURIComponent(id)+"/comments",{method:"POST",body:JSON.stringify({content})});},
+  deleteComment(post,id){return request("/announcements/"+encodeURIComponent(post)+"/comments/"+encodeURIComponent(id),{method:"DELETE"});},
   countdowns() { return request("/countdowns"); },
   saveCountdown(value,id) { return request("/countdowns"+(id?"/"+encodeURIComponent(id):""),{method:id?"PATCH":"POST",body:JSON.stringify(value)}); },
   deleteCountdown(id) { return request("/countdowns/"+encodeURIComponent(id),{method:"DELETE"}); },

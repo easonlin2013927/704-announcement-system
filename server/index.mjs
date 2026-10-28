@@ -7,6 +7,20 @@ const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
 const categories = new Set(["important","academic","activity","general"]);
+const themes=new Set(["dark","light","ocean","forest","rose","amber","midnight"]);
+function profile(account){return {id:account.id,role:account.role,display_name:account.display_name,must_change_password:account.must_change_password,nickname:account.nickname,theme:account.theme,avatar_url:account.avatar_url};}
+function validAvatar(value){
+ if(value==="")return true;
+ if(typeof value!=="string"||value.length>220000)return false;
+ const match=value.match(/^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/);if(!match)return false;
+ const bytes=Buffer.from(match[2],"base64");if(bytes.length>160000||bytes.toString("base64")!==match[2])return false;
+ return match[1]==="png"?bytes.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])):match[1]==="jpeg"?bytes[0]===255&&bytes[1]===216&&bytes[2]===255:bytes.toString("ascii",0,4)==="RIFF"&&bytes.toString("ascii",8,12)==="WEBP";
+}
+async function visibleAnnouncement(client,id,user,lock=""){
+ const row=(await client.query("select * from announcements704 where id=$1"+lock,[id])).rows[0];
+ if(!row)fail(404,"找不到公告");
+ if(user.role==="student"&&!["學生","全部人員","全校學生","七年級","八年級","九年級"].includes(row.audience))fail(403,"無法閱讀此公告");return row;
+}
 async function body(req) {
  let data = ""; for await (const chunk of req) { data += chunk; if (Buffer.byteLength(data) > 262144) throw Object.assign(new Error("內容過長"),{status:413}); }
  try { return JSON.parse(data); } catch { throw Object.assign(new Error("JSON 格式錯誤"),{status:400}); }
@@ -49,7 +63,7 @@ const server = createServer(async (req,res) => {
  if (!["teacher","student","admin"].includes(data.portal) || data.portal !== account.role) fail(403,"帳號不屬於此登入入口");
  const token = randomBytes(32).toString("hex");
  await db.query("insert into sessions704 values($1,$2,now()+interval '8 hours')",[digest(token),account.id]);
- return send(200,{token,profile:{role:account.role,display_name:account.display_name,must_change_password:account.must_change_password}});
+ return send(200,{token,profile:profile(account)});
  }
  const token = req.headers.authorization?.replace(/^Bearer /,"") || "";
  const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
@@ -72,10 +86,16 @@ const server = createServer(async (req,res) => {
  const nextToken=randomBytes(32).toString("hex");
  await client.query("insert into sessions704 values($1,$2,now()+interval '8 hours')",[digest(nextToken),user.id]);
  await client.query("commit");
- return send(200,{token:nextToken,profile:{role:account.role,display_name:account.display_name,must_change_password:false}});
+ return send(200,{token:nextToken,profile:profile({...account,must_change_password:false})});
  }catch(error){await client.query("rollback");throw error;}finally{client.release();}
  }
  if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
+ if(path==="/me"&&req.method==="GET")return send(200,profile((await db.query("select * from accounts704 where id=$1",[user.id])).rows[0]));
+ if(path==="/me"&&req.method==="PATCH"){
+ const value=await body(req);
+ if(typeof value.nickname!=="string"||value.nickname.length>80||!themes.has(value.theme)||!validAvatar(value.avatar_url))fail(400,"個人化資料格式錯誤；頭像請使用 PNG、JPEG 或 WebP，且壓縮後不超過 160 KB");
+ return send(200,profile((await db.query("update accounts704 set nickname=$1,theme=$2,avatar_url=$3 where id=$4 returning *",[value.nickname.trim(),value.theme,value.avatar_url,user.id])).rows[0]));
+ }
  if (path === "/settings/banner" && ["GET","PUT"].includes(req.method)) {
  if (!["teacher","admin"].includes(user.role)) fail(403,"僅限教師或維護人員設定標語");
  if(req.method==="GET") return send(200,(await db.query("select enabled,content from login_banner704 where id=1")).rows[0]);
@@ -152,21 +172,43 @@ const server = createServer(async (req,res) => {
  if(countdownMatch && req.method==="DELETE"){await db.query("delete from countdowns704 where id=$1",[countdownMatch[1]]);return send(200,{ok:true});}
  fail(404,"找不到此功能");
  }
- if (path === "/announcements" && req.method === "GET") return send(200,(await db.query(user.role !== "student" ? "select * from announcements704 order by pinned desc,date desc" : "select * from announcements704 where audience=$1 or audience='全部人員' or audience in ('全校學生','七年級','八年級','九年級') order by pinned desc,date desc", user.role !== "student" ? [] : [user.role === "teacher" ? "教師" : "學生"])).rows);
- if (!["teacher","admin"].includes(user.role)) fail(403,"僅限教師或管理員管理公告");
- const match = path.match(/^\/announcements\/([0-9a-f-]{36})$/i);
- if ((path === "/announcements" && req.method === "POST") || (match && req.method === "PATCH")) {
- const b = await body(req);
- if (typeof b.title !== "string" || !b.title.trim() || b.title.trim().length>80 || !categories.has(b.category) || typeof b.content !== "string" || !b.content.trim() || typeof b.audience !== "string" || b.audience.length>100 || typeof b.pinned !== "boolean") fail(400,"公告欄位不完整或格式錯誤");
- const values=[b.title.trim(),b.category,user.display_name,b.audience,b.pinned,b.content];
- const result=match ? await db.query("update announcements704 set title=$1,category=$2,author=$3,audience=$4,pinned=$5,content=$6 where id=$7 returning *",[...values,match[1]]) : await db.query("insert into announcements704(title,category,author,audience,pinned,content,id) values($1,$2,$3,$4,$5,$6,$7) returning *",[...values,randomUUID()]);
- if(!result.rows[0]) fail(404,"找不到公告");
- return send(200,result.rows[0]);
+ const commentsMatch=path.match(/^\/announcements\/([0-9a-f-]{36})\/comments(?:\/([0-9a-f-]{36}))?$/i);
+ if(commentsMatch){
+ const announcement=await visibleAnnouncement(db,commentsMatch[1],user);
+ const moderates=user.role==="admin"||announcement.author_id===user.id;
+ if(req.method==="GET"&&!commentsMatch[2]){
+ const rows=announcement.comments_enabled?(await db.query("select c.id,c.content,c.created_at,c.account_id,coalesce(a.display_name,c.author_name) as author,a.nickname as nickname,a.avatar_url as avatar_url from comments704 c left join accounts704 a on a.id=c.account_id where c.announcement_id=$1 order by c.created_at,c.id",[announcement.id])).rows:[];
+ return send(200,{enabled:announcement.comments_enabled,comments:rows.map(row=>({...row,can_delete:moderates||row.account_id===user.id}))});
  }
- if(match && req.method==="DELETE") {
- const result=await db.query("delete from announcements704 where id=$1 returning id",[match[1]]);
- if(!result.rowCount) fail(404,"找不到公告");
- return send(200,{ok:true});
+ if(req.method==="POST"&&!commentsMatch[2]){
+ const value=await body(req);if(typeof value.content!=="string"||!value.content.trim()||value.content.length>2000)fail(400,"請輸入 1 至 2000 字的評論");
+ const client=await db.connect();try{await client.query("begin");const current=await visibleAnnouncement(client,announcement.id,user," for share");if(!current.comments_enabled)fail(403,"公告評論區已關閉");const result=await client.query("insert into comments704(id,announcement_id,account_id,author_name,content) values($1,$2,$3,$4,$5) returning id",[randomUUID(),current.id,user.id,user.display_name,value.content.trim()]);await client.query("commit");return send(201,result.rows[0]);}catch(error){await client.query("rollback");throw error;}finally{client.release();}
+ }
+ if(req.method==="DELETE"&&commentsMatch[2]){
+ const comment=(await db.query("select * from comments704 where id=$1 and announcement_id=$2",[commentsMatch[2],announcement.id])).rows[0];if(!comment)fail(404,"找不到評論");
+ if(!moderates&&comment.account_id!==user.id)fail(403,"沒有刪除此評論的權限");
+ await db.query("delete from comments704 where id=$1",[comment.id]);return send(200,{ok:true});
+ }
+ fail(404,"找不到此功能");
+ }
+ if(path==="/announcements"&&req.method==="GET"){
+ const query="select n.*,coalesce(a.display_name,n.author) as author,a.nickname as author_nickname,a.avatar_url as author_avatar from announcements704 n left join accounts704 a on a.id=n.author_id";
+ return send(200,(await db.query(query+(user.role==="student"?" where n.audience in ('學生','全部人員','全校學生','七年級','八年級','九年級')":"")+" order by n.pinned desc,n.date desc")).rows);
+ }
+ if(!["teacher","admin"].includes(user.role))fail(403,"僅限教師或管理員管理公告");
+ const match=path.match(/^\/announcements\/([0-9a-f-]{36})$/i);
+ if((path==="/announcements"&&req.method==="POST")||(match&&req.method==="PATCH")){
+ const b=await body(req);
+ if(typeof b.title!=="string"||!b.title.trim()||b.title.trim().length>80||!categories.has(b.category)||typeof b.content!=="string"||!b.content.trim()||!["學生","教師","全部人員"].includes(b.audience)||typeof b.pinned!=="boolean"||(b.comments_enabled!==undefined&&typeof b.comments_enabled!=="boolean"))fail(400,"公告欄位不完整或格式錯誤");
+ if(match){
+ const client=await db.connect();try{await client.query("begin");const current=await visibleAnnouncement(client,match[1],user," for update");const enabled=b.comments_enabled??current.comments_enabled;
+ if(enabled!==current.comments_enabled&&user.role!=="admin"&&current.author_id!==user.id)fail(403,"只有公告張貼者或管理員可以切換評論區");
+ const result=await client.query("update announcements704 set title=$1,category=$2,audience=$3,pinned=$4,content=$5,comments_enabled=$6 where id=$7 returning *",[b.title.trim(),b.category,b.audience,b.pinned,b.content,enabled,current.id]);await client.query("commit");return send(200,result.rows[0]);}catch(error){await client.query("rollback");throw error;}finally{client.release();}
+ }
+ return send(200,(await db.query("insert into announcements704(id,title,category,author,author_id,audience,pinned,content,comments_enabled) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *",[randomUUID(),b.title.trim(),b.category,user.display_name,user.id,b.audience,b.pinned,b.content,b.comments_enabled??false])).rows[0]);
+ }
+ if(match&&req.method==="DELETE"){
+ const result=await db.query("delete from announcements704 where id=$1 returning id",[match[1]]);if(!result.rowCount)fail(404,"找不到公告");return send(200,{ok:true});
  }
  fail(404,"找不到此功能");
  } catch(error) {

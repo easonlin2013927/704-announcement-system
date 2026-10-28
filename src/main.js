@@ -1,5 +1,6 @@
-import { cloud } from "./cloud.js?v=0.9.1";
+import { cloud } from "./cloud.js?v=0.10.0";
 import { portals, portalRole } from "./portal.js";
+import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
 
 let activeRole = portalRole(location.hash);
 window.addEventListener("hashchange", () => {
@@ -23,6 +24,7 @@ const categories = {
 const state = {
   session: null,
   settingsOpen: false,
+  settingsTab: "personal",
   banner: { enabled: false, content: "" },
   accounts: [],
   countdowns: [],
@@ -95,6 +97,7 @@ function formatDate(value, detailed = false) {
 
 function icon(name, size = 20) {
   const paths = {
+    code: '<path d="m8 5-7 7 7 7m8-14 7 7-7 7M14 3l-4 18"/>',
     home: '<path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z"/>',
     bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
     search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
@@ -131,6 +134,7 @@ function toast(message, tone = "success") {
 }
 
 function render() {
+  applyTheme(state.session?.theme || "dark");
   if (!state.session) return renderLogin();
   if (state.session.must_change_password) return renderPasswordChange();
   if (state.settingsOpen) return renderSettings();
@@ -152,7 +156,7 @@ function renderLogin() {
   document.title = portal.title + "｜704公告系統";
   app.innerHTML = `
     <main class="login-shell">
-      <header class="login-masthead"><span class="portal-emblem">704</span><span>704公告系統</span><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
+      <header class="login-masthead"><span class="portal-emblem">704</span><span>704公告系統</span><a class="repo-button" href="https://github.com/easonlin2013927/704-announcement-system" target="_blank" rel="noopener noreferrer">GitHub ↗</a><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
       ${state.marquee.enabled && state.marquee.content ? `<div class="login-marquee site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}
       <div class="login-center">
         <section class="login-slogan rich-content" aria-label="登入標語" ${state.banner.enabled && stripHtml(state.banner.content).trim() ? "" : "hidden"}>${sanitizeHtml(state.banner.content)}</section>
@@ -196,9 +200,10 @@ function headerTemplate() {
     <header class="topbar">
       <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>校園公告</small></span></button>
       <nav class="top-actions">
+        <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-announcement-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
         <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
         <span class="role-chip">${portals[state.session.role].label}端</span>
-        <div class="user-block"><span class="avatar">${escapeHtml(state.session.name.charAt(0))}</span><span><strong>${escapeHtml(state.session.name)}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
+        <div class="user-block">${avatarMarkup(state.session.name,state.session.avatar_url)}<span><strong title="${escapeHtml(identityName(state.session.name,state.session.nickname))}">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
 ${["admin","teacher"].includes(state.session.role) ? `<button class="secondary-button" id="open-accounts">${state.session.role==="teacher"?"學生帳號":"帳號管理"}</button>` : ""}
 <button class="secondary-button" id="open-settings">設定</button>
         <button class="icon-button" id="logout" title="登出">${icon("logout")}</button>
@@ -292,7 +297,7 @@ function renderAccounts() {
 
 function goHome(){state.selectedId=null;state.editingId=null;state.settingsOpen=false;state.adminView="dashboard";render();}
 function bindHeader() {
-  document.querySelector("#open-settings")?.addEventListener("click",()=>{state.settingsOpen=true;state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();});
+  document.querySelector("#open-settings")?.addEventListener("click",()=>{state.settingsOpen=true;state.settingsTab="personal";state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();});
   document.querySelector("#open-accounts")?.addEventListener("click",()=>{state.settingsOpen=false;state.adminView="accounts";state.editingId=null;state.selectedId=null;render();});
   document.querySelectorAll("[data-home]").forEach(button=>button.addEventListener("click",goHome));
   document.querySelector("#logout")?.addEventListener("click",()=>{cloud.logout();state.session=null;state.settingsOpen=false;state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();refreshBanner();});
@@ -384,7 +389,7 @@ function announcementCard(item, isTeacher) {
   return `<article class="announcement-card ${item.pinned ? "pinned" : ""}" data-open="${item.id}" tabindex="0">
     <div class="card-meta"><span class="category-tag ${category.tone}">${item.pinned ? icon("pin", 13) : ""}${category.label}</span><time>${formatDate(item.date)}</time></div>
     <h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(excerpt)}${stripHtml(item.content).length > 112 ? "…" : ""}</p>
-    <footer><div class="author"><span class="avatar mini">${escapeHtml(item.authorInitial)}</span><span><strong>${escapeHtml(item.author)}</strong><small>${escapeHtml(item.audience)}</small></span></div>
+    <footer><div class="author">${avatarMarkup(item.author,item.author_avatar,"mini")}<span><strong>${escapeHtml(identityName(item.author,item.author_nickname))}</strong><small>${escapeHtml(item.audience)}</small></span></div>
     ${isTeacher ? `<div class="card-actions"><button data-edit="${item.id}" title="編輯">${icon("edit", 17)}</button><button class="danger" data-delete="${item.id}" title="刪除">${icon("trash", 17)}</button></div>` : `<span class="read-more">閱讀全文 ${icon("arrow", 16)}</span>`}</footer>
   </article>`;
 }
@@ -398,12 +403,13 @@ function renderDetail() {
     <button class="back-button" id="back">${icon("back", 18)} 返回公告列表</button>
     <article class="article-paper">
       <header><div class="article-tags"><span class="category-tag ${category.tone}">${item.pinned ? icon("pin", 13) : ""}${category.label}</span><span class="audience-tag">${icon("users", 14)} ${escapeHtml(item.audience)}</span></div>
-      <h1>${escapeHtml(item.title)}</h1><div class="article-byline"><span class="avatar">${escapeHtml(item.authorInitial)}</span><div><strong>${escapeHtml(item.author)}</strong><span>${icon("clock", 14)} 發布於 ${formatDate(item.date, true)}</span></div></div></header>
+      <h1>${escapeHtml(item.title)}</h1><div class="article-byline">${avatarMarkup(item.author,item.author_avatar)}<div><strong>${escapeHtml(identityName(item.author,item.author_nickname))}</strong><span>${icon("clock", 14)} 發布於 ${formatDate(item.date, true)}</span></div></div></header>
       <div class="rich-content">${sanitizeHtml(item.content)}</div>
       ${isTeacher ? `<footer class="article-controls"><button class="secondary-button" id="edit-post">${icon("edit", 17)} 編輯公告</button><button class="danger-button" id="delete-post">${icon("trash", 17)} 刪除</button></footer>` : ""}
-    </article>
+    </article><section class="editor-card comments-panel" aria-label="公告評論"><h2>評論</h2><p id="comments-message" role="status">載入評論中…</p><div id="comments-list"></div><form id="comment-form" class="comment-form" hidden><label for="comment-content">發表評論</label><textarea id="comment-content" name="content" maxlength="2000" required placeholder="輸入評論…"></textarea><button class="primary-button">送出評論</button></form></section>
   </main>`;
   bindHeader();
+  bindComments(item);
   document.querySelector("#back").addEventListener("click", () => { state.selectedId = null; render(); });
   document.querySelector("#edit-post")?.addEventListener("click", () => { state.editingId = item.id; state.selectedId = null; render(); });
   document.querySelector("#delete-post")?.addEventListener("click", () => deleteAnnouncement(item.id));
@@ -411,6 +417,7 @@ function renderDetail() {
 
 function renderEditor() {
   const existing = state.editingId === "new" ? null : state.announcements.find((item) => item.id === state.editingId);
+  const canManageComments=!existing||state.session.role==="admin"||existing.author_id===state.session.id;
   app.innerHTML = `${headerTemplate()}<main class="editor-shell">
     <button class="back-button" id="cancel-edit">${icon("back", 18)} 取消並返回</button>
     <div class="editor-heading"><div><span class="eyebrow dark">RICH TEXT EDITOR</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>運用清楚的層次與重點標示，讓學生快速掌握資訊。</p></div></div>
@@ -423,6 +430,7 @@ function renderEditor() {
       <label class="editor-label">公告內容</label>
       ${editorMarkup(existing?.content || "")}
       <div class="editor-options"><label class="switch-row"><input type="checkbox" name="pinned" ${existing?.pinned ? "checked" : ""}><span class="switch"></span><span><strong>置頂公告</strong><small>讓這則公告優先顯示在列表最上方</small></span></label></div>
+      ${canManageComments?`<label class="check-option"><input type="checkbox" name="comments_enabled" ${existing?.comments_enabled?"checked":""}>開啟評論區</label>`:'<p class="muted">評論區開關由公告張貼者或管理員設定。</p>'}
       <footer class="editor-footer"><span>${icon("spark", 17)} 提示：善用螢光筆標示日期與重要事項</span><div><button type="button" class="secondary-button" id="cancel-edit-bottom">取消</button><button class="primary-button" type="submit">${existing ? "儲存變更" : "發布公告"}</button></div></footer>
     </form>
   </main>`;
@@ -440,11 +448,11 @@ function renderEditor() {
       author: state.session.name, authorInitial: state.session.name.charAt(0), audience: data.get("audience"),
       date: existing?.date || new Date().toISOString(), pinned: data.get("pinned") === "on", content: sanitizeHtml(editor.innerHTML),
     };
+    if(canManageComments)announcement.comments_enabled=data.get("comments_enabled")==="on";
     try {
       await cloud.save(announcement, Boolean(existing));
+      state.announcements=await cloud.list();
     } catch (error) { toast(error.message, "error"); return; }
-    if (existing) state.announcements = state.announcements.map((item) => item.id === existing.id ? announcement : item);
-    else state.announcements.unshift(announcement);
     state.editingId = null; render(); toast(existing ? "公告已更新" : "公告已發布");
   });
 }
@@ -535,9 +543,34 @@ function bindStatusTable(){
  const refresh=async()=>{button.disabled=true;try{const s=await cloud.status();const rows=[["API","正常"],["資料庫","PostgreSQL／連線正常"],["公告數量",s.announcements],["活動數量",s.activities],["人員數量",s.accounts],["執行環境名稱",s.host],["作業系統",s.platform],["處理器",s.cpu],["主機記憶體",s.memory],["主機運作時間",s.uptime],["更新時間",formatDate(s.checked_at,true)]];body.innerHTML=rows.map(([key,value])=>`<tr><th scope="row">${key}</th><td>${escapeHtml(String(value??"—"))}</td></tr>`).join("");message.textContent="";}catch(error){message.textContent=error.message;}finally{button.disabled=false;}};
  button.addEventListener("click",refresh);refresh();
 }
-function renderSettings() {
-  if(state.session.role==="student"){app.innerHTML=`${headerTemplate()}<main class="editor-shell"><h1>設定</h1><section class="editor-card"><h2>個人資訊</h2><p>${escapeHtml(state.session.name)}</p><p>學生</p></section></main>`;bindHeader();return;}
-  app.innerHTML = `${headerTemplate()}<main class="editor-shell settings-shell">
+function identityName(name,nickname){return nickname?.trim()?`${name}（${nickname.trim()}）`:name;}
+function avatarMarkup(name,url,size=""){
+ const safe=typeof url==="string"&&/^data:image\/(png|jpeg|webp);base64,/.test(url);
+ return `<span class="avatar ${size}" role="img" aria-label="${escapeHtml(name||"使用者")}的頭像">${safe?`<img src="${escapeHtml(url)}" alt="">`:escapeHtml(Array.from((name||"?").trim())[0]||"?")}</span>`;
+}
+function bindComments(item){
+ const message=document.querySelector("#comments-message"),list=document.querySelector("#comments-list"),form=document.querySelector("#comment-form");
+ const load=async()=>{try{const data=await cloud.comments(item.id);if(!list.isConnected)return;form.hidden=!data.enabled;message.textContent=data.enabled?(data.comments.length?`${data.comments.length} 則評論`:"還沒有評論，來發表第一則吧。"):"此公告尚未開啟評論區。";list.innerHTML=data.comments.map(comment=>`<article class="comment-row">${avatarMarkup(comment.author,comment.avatar_url,"mini")}<div class="comment-body"><strong>${escapeHtml(identityName(comment.author,comment.nickname))}</strong><time>${formatDate(comment.created_at,true)}</time><p>${escapeHtml(comment.content)}</p>${comment.can_delete?`<button type="button" class="secondary-button" data-delete-comment="${comment.id}">刪除評論</button>`:""}</div></article>`).join("");}catch(error){message.textContent=error.message;}};
+ form.addEventListener("submit",async event=>{event.preventDefault();const button=form.querySelector("button"),content=new FormData(form).get("content");button.disabled=true;try{await cloud.addComment(item.id,content);form.reset();await load();}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
+ list.addEventListener("click",async event=>{const button=event.target.closest("[data-delete-comment]");if(!button)return;if(button.dataset.confirmed!=="yes"){button.dataset.confirmed="yes";button.textContent="確定刪除評論";return;}button.disabled=true;try{await cloud.deleteComment(item.id,button.dataset.deleteComment);await load();}catch(error){message.textContent=error.message;button.disabled=false;}});load();
+}
+function settingsTabs(){return `<nav class="settings-tabs" aria-label="設定分類"><button class="secondary-button" data-settings-tab="personal" aria-selected="${state.settingsTab!=="site"}">個人化</button>${state.session.role!=="student"?`<button class="secondary-button" data-settings-tab="site" aria-selected="${state.settingsTab==="site"}">網站設定</button>`:""}</nav>`;}
+function bindSettingsTabs(){document.querySelectorAll("[data-settings-tab]").forEach(button=>button.addEventListener("click",()=>{state.settingsTab=button.dataset.settingsTab;render();}));}
+function renderSettings(){if(state.settingsTab==="site"&&state.session.role!=="student")return renderSiteSettings();return renderPersonalization();}
+function renderPersonalization(){
+ let avatar=state.session.avatar_url||"",theme=state.session.theme||"dark";
+ app.innerHTML=`${headerTemplate()}<main class="editor-shell settings-shell">${settingsTabs()}<div class="editor-heading"><span class="eyebrow dark">PERSONALIZATION</span><h1>個人化</h1><p>選擇系統風格、設定頭像與暱稱，儲存後會跟隨帳號保留。</p></div><form id="profile-form" class="editor-card"><h2>個人資料</h2><div class="profile-preview"><div id="profile-avatar">${avatarMarkup(state.session.name,avatar,"large")}</div><div><strong id="profile-name">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>原顯示名稱：${escapeHtml(state.session.name)}</small></div></div><label for="nickname">暱稱</label><input id="nickname" name="nickname" maxlength="80" value="${escapeHtml(state.session.nickname||"")}" placeholder="可留空，仍會保留原顯示名稱"><label class="editor-label" for="avatar-file">上傳頭像</label><div class="profile-upload"><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp"><button type="button" class="secondary-button" id="remove-avatar">移除頭像</button></div><p class="muted">PNG、JPEG、WebP，原圖最多 5 MB；系統會裁切成正方形並壓縮保存。</p><h2>系統風格</h2><div class="theme-grid" role="group" aria-label="選擇系統風格">${themes.map(option=>`<button type="button" class="theme-card" data-theme-choice="${option.id}" aria-pressed="${option.id===theme}" style="--preview-bg:${option.bg};--preview-surface:${option.surface};--preview-ink:${option.text};--preview-accent:${option.accent}"><div class="theme-preview"><div class="theme-preview-bar"></div><div class="theme-preview-panel">704 公告預覽</div></div><strong>${option.name}</strong><small>${option.description}</small></button>`).join("")}</div><p id="profile-message" role="status"></p><footer class="editor-footer"><span>風格可即時預覽，按儲存才會保存到帳號。</span><button class="primary-button" id="save-profile">儲存個人化設定</button></footer></form></main>`;
+ bindHeader();bindSettingsTabs();
+ const form=document.querySelector("#profile-form"),file=document.querySelector("#avatar-file"),message=document.querySelector("#profile-message"),save=document.querySelector("#save-profile");
+ const preview=()=>{document.querySelector("#profile-avatar").innerHTML=avatarMarkup(state.session.name,avatar,"large");document.querySelector("#profile-name").textContent=identityName(state.session.name,form.elements.nickname.value);};
+ form.elements.nickname.addEventListener("input",preview);
+ file.addEventListener("change",async()=>{if(!file.files[0])return;save.disabled=true;try{avatar=await prepareAvatar(file.files[0]);preview();message.textContent="頭像已準備完成，請儲存設定。";}catch(error){message.textContent=error.message;file.value="";}finally{save.disabled=false;}});
+ document.querySelector("#remove-avatar").addEventListener("click",()=>{avatar="";file.value="";preview();});
+ document.querySelectorAll("[data-theme-choice]").forEach(button=>button.addEventListener("click",()=>{theme=button.dataset.themeChoice;applyTheme(theme);document.querySelectorAll("[data-theme-choice]").forEach(choice=>choice.setAttribute("aria-pressed",String(choice===button)));}));
+ form.addEventListener("submit",async event=>{event.preventDefault();save.disabled=true;try{const profile=await cloud.saveProfile({nickname:form.elements.nickname.value,theme,avatar_url:avatar});state.session={...state.session,...profile,name:profile.display_name};state.announcements=await cloud.list();render();toast("個人化設定已儲存");}catch(error){message.textContent=error.message;}finally{save.disabled=false;}});
+}
+function renderSiteSettings() {
+  app.innerHTML = `${headerTemplate()}<main class="editor-shell settings-shell">${settingsTabs()}
     <button class="back-button" id="close-settings">${icon("back",18)} 返回</button>
     <div class="editor-heading"><span class="eyebrow dark">PORTAL SETTINGS</span><h1>設定</h1>
     <p>教師與維護人員共用設定，會套用至三個登入入口。</p></div>
@@ -551,7 +584,7 @@ function renderSettings() {
       <footer class="editor-footer"><span>儲存後，新開啟登入頁即可看見更新。</span><button id="save-banner" class="primary-button">儲存設定</button></footer>
       ${state.session.role === "admin" ? `<hr><h2>網站頂端跑馬公告</h2><label class="switch-row"><input id="marquee-enabled" type="checkbox"><span class="switch"></span><span><strong>顯示全站跑馬公告</strong><small>公告會顯示在登入頁與已登入頁面的最上方。</small></span></label><label class="editor-label" for="marquee-content">跑馬公告文字</label><textarea id="marquee-content" maxlength="1000" rows="3" placeholder="輸入要公告給全站的短訊息"></textarea><div class="editor-footer"><span>最多 1000 字；停用後內容仍會保留。</span><button id="save-marquee" class="secondary-button">儲存跑馬公告</button></div>` : ""}
     </div></section></main>`;
-  bindHeader();
+  bindHeader();bindSettingsTabs();
   document.querySelector("#close-settings").addEventListener("click",goHome);
   bindStatusTable();
   const message = document.querySelector("#settings-message");
