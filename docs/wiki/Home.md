@@ -4,9 +4,9 @@
 
 | 身分 | 登入網址 |
 | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.1#/student/login) |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.1#/teacher/login) |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.1#/admin/login) |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.6.0#/student/login) |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.6.0#/teacher/login) |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.6.0#/admin/login) |
 
 請使用符合帳號角色的入口。三個畫面獨立，切換網址不會取得不同角色權限。
 

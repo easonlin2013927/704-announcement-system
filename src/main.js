@@ -1,4 +1,4 @@
-import { cloud } from "./cloud.js?v=0.5.1";
+import { cloud } from "./cloud.js?v=0.6.0";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
@@ -25,6 +25,7 @@ const state = {
   settingsOpen: false,
   banner: { enabled: false, content: "" },
   accounts: [],
+  countdowns: [],
   adminView: "dashboard",
   marquee: { enabled: false, content: "" },
   announcements: [],
@@ -170,6 +171,7 @@ function renderLogin() {
       const profile = await cloud.login(data.get("account"), data.get("password"), activeRole);
       if (profile.role !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
       state.announcements = await cloud.list();
+      state.countdowns = await cloud.countdowns();
       state.session = { ...profile, name: profile.display_name };
       state.selectedId = null;
       state.editingId = null;
@@ -267,6 +269,9 @@ function filteredAnnouncements() {
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.date) - new Date(a.date));
 }
 
+function updateCountdowns(){document.querySelectorAll("[data-countdown-at]").forEach(node=>{const seconds=Math.max(0,Math.ceil((new Date(node.dataset.countdownAt).getTime()-Date.now())/1000));node.textContent=seconds ? `${Math.floor(seconds/86400)} 天 ${String(Math.floor(seconds%86400/3600)).padStart(2,"0")} 時 ${String(Math.floor(seconds%3600/60)).padStart(2,"0")} 分 ${String(seconds%60).padStart(2,"0")} 秒` : "活動已開始";});}
+setInterval(updateCountdowns,1000);
+
 function renderDashboard() {
   const isTeacher = ["teacher","admin"].includes(state.session.role);
   const isAdmin = state.session.role === "admin";
@@ -279,6 +284,7 @@ function renderDashboard() {
         ${isTeacher ? `<button class="primary-button" id="new-post">${icon("plus", 18)} 發布新公告</button>` : `<div class="date-card"><span>${new Intl.DateTimeFormat("zh-TW", { weekday: "long" }).format(new Date())}</span><strong>${new Intl.DateTimeFormat("zh-TW", { month: "long", day: "numeric" }).format(new Date())}</strong></div>`}
       </section>
       ${isAdmin ? `<section class="article-paper admin-service-status"><strong>系統狀態</strong><span id="admin-service-status" role="status">檢查中…</span><button class="secondary-button" id="refresh-admin-status">重新檢查</button></section>` : ""}
+      <section class="countdown-section"><div class="section-heading"><h2>活動倒數</h2></div><div class="countdown-grid">${state.countdowns.map(item=>`<article class="editor-card countdown-card"><h3>${escapeHtml(item.title)}</h3><time>${formatDate(item.target_at,true)}</time><p class="countdown-value" data-countdown-at="${escapeHtml(item.target_at)}"></p>${isTeacher?`<button class="secondary-button" data-edit-countdown="${item.id}">編輯</button> <button class="danger-button" data-delete-countdown="${item.id}">刪除</button>`:""}</article>`).join("") || '<p class="muted">目前沒有倒數活動。</p>'}</div>${isTeacher?`<form id="countdown-form" class="editor-card"><h3 id="countdown-form-title">新增倒數活動</h3><input type="hidden" name="id"><div class="form-grid"><label>活動名稱<input name="title" required maxlength="80"></label><label>活動時間（目前裝置時區）<input name="target_at" type="datetime-local" required></label></div><footer class="editor-footer"><button class="primary-button">儲存活動</button><button type="reset" class="secondary-button">取消編輯</button></footer></form>`:""}</section>
       <section class="toolbar" aria-label="公告篩選">
         <label class="search-box">${icon("search", 19)}<input id="search" value="${escapeHtml(state.search)}" placeholder="搜尋標題、內容或發布教師"></label>
         <div class="filter-tabs">
@@ -292,6 +298,12 @@ function renderDashboard() {
     </main>`;
   bindHeader();
   const refreshStatus=document.querySelector("#refresh-admin-status");
+  updateCountdowns();
+  const countdownForm=document.querySelector("#countdown-form");
+  countdownForm?.addEventListener("submit",async event=>{event.preventDefault();const data=new FormData(countdownForm);const button=countdownForm.querySelector(".primary-button");button.disabled=true;try{await cloud.saveCountdown({title:data.get("title"),target_at:new Date(data.get("target_at")).toISOString()},data.get("id"));state.countdowns=await cloud.countdowns();renderDashboard();toast("活動已儲存");}catch(error){toast(error.message,"error");}finally{button.disabled=false;}});
+  document.querySelectorAll("[data-edit-countdown]").forEach(button=>button.addEventListener("click",()=>{const item=state.countdowns.find(row=>row.id===button.dataset.editCountdown);const date=new Date(item.target_at);const local=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);countdownForm.elements.id.value=item.id;countdownForm.elements.title.value=item.title;countdownForm.elements.target_at.value=local;document.querySelector("#countdown-form-title").textContent="編輯倒數活動";countdownForm.elements.title.focus();}));
+  countdownForm?.addEventListener("reset",()=>{document.querySelector("#countdown-form-title").textContent="新增倒數活動";queueMicrotask(()=>{countdownForm.elements.id.value="";});});
+  document.querySelectorAll("[data-delete-countdown]").forEach(button=>button.addEventListener("click",async()=>{if(!confirm("確定刪除此倒數活動？"))return;try{await cloud.deleteCountdown(button.dataset.deleteCountdown);state.countdowns=await cloud.countdowns();renderDashboard();}catch(error){toast(error.message,"error");}}));
   if(refreshStatus){const status=document.querySelector("#admin-service-status");const check=async()=>{refreshStatus.disabled=true;try{const result=await cloud.status();status.textContent=`API 與資料庫連線正常；目前共有 ${result.announcements} 則公告。`;}catch(error){status.textContent=error.message;}finally{refreshStatus.disabled=false;}};refreshStatus.addEventListener("click",check);check();}
   document.querySelector("#new-post")?.addEventListener("click", () => { state.editingId = "new"; render(); });
   document.querySelector("#search").addEventListener("input", (event) => {
@@ -355,7 +367,7 @@ function renderEditor() {
       <div class="form-grid">
         <label class="span-2">公告標題<input name="title" maxlength="80" value="${escapeHtml(existing?.title || "")}" placeholder="輸入清楚明確的公告標題" required></label>
         <label>公告分類<select name="category">${Object.entries(categories).map(([key, category]) => `<option value="${key}" ${existing?.category === key ? "selected" : ""}>${category.label}</option>`).join("")}</select></label>
-        <label>公告對象<select name="audience">${["全校學生", "七年級", "八年級", "九年級"].map((value) => `<option ${existing?.audience === value ? "selected" : ""}>${value}</option>`).join("")}</select></label>
+        <label>公告對象<select name="audience">${["學生", "教師", "全部人員"].map((value) => `<option ${(existing?.audience || "學生") === value ? "selected" : ""}>${value}</option>`).join("")}</select></label>
       </div>
       <label class="editor-label">公告內容</label>
       ${editorMarkup(existing?.content || "")}
@@ -421,9 +433,12 @@ function bindRichEditor() {
     if (savedRange) { const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(savedRange); }
   };
   document.querySelectorAll("[data-command]").forEach((button) => button.addEventListener("mousedown", (event) => {
-    event.preventDefault(); document.execCommand(button.dataset.command, false); editor.focus();
+    event.preventDefault(); restore(); document.execCommand(button.dataset.command, false); capture(); editor.dispatchEvent(new Event("input",{bubbles:true}));
   }));
   document.querySelector("#highlight-color").addEventListener("input", (event) => {
+    document.querySelector(".color-tool").style.borderBottomColor=event.target.value;
+    document.querySelector(".highlight-icon").style.backgroundColor=event.target.value;
+    document.querySelector(".highlight-icon").style.color="#171321";
     restore();
     document.execCommand("hiliteColor", false, event.target.value); editor.focus();
   });

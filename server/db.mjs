@@ -2,6 +2,7 @@ import pg from "pg";
 export const db = new pg.Pool({ host: process.env.PGHOST, port: Number(process.env.PGPORT || 5432), database: process.env.PGDATABASE, user: process.env.PGUSER, password: process.env.PGPASSWORD, max: 5, connectionTimeoutMillis: 10000 });
 db.on("error", () => console.error("Database connection interrupted"));
 export async function migrate() {
+ await db.query(`create table if not exists countdowns704 (id uuid primary key, title text not null, target_at timestamptz not null, created_at timestamptz not null default now());`);
  await db.query(`create table if not exists accounts704 (
  id uuid primary key, email text unique not null, display_name text not null,
  role text not null check(role in ('teacher','student','admin')), password_hash text not null);
@@ -15,6 +16,7 @@ export async function migrate() {
  id integer primary key check (id=1), enabled boolean not null default false,
  content text not null default '', updated_at timestamptz not null default now());
  insert into login_banner704 (id) values(1) on conflict do nothing;`);
+ await db.query("update announcements704 set audience='學生' where audience in ('全校學生','七年級','八年級','九年級')");
  await db.query(`create table if not exists site_marquee704 (
  id integer primary key check (id=1), enabled boolean not null default false,
  content text not null default '', updated_at timestamptz not null default now());

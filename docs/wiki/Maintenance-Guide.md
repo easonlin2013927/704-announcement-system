@@ -1,6 +1,6 @@
 # 維護人員使用說明
 
-[前往維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.1#/admin/login)
+[前往維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.6.0#/admin/login)
 
 請使用維護人員獨立入口，輸入 role 為 admin 的帳號。教師或學生帳號不能登入此入口。
 

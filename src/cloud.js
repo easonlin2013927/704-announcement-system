@@ -40,6 +40,9 @@ export const cloud = {
     await request("/announcements/" + encodeURIComponent(id), { method: "DELETE" });
   },
   status() { return request("/admin/status"); },
+  countdowns() { return request("/countdowns"); },
+  saveCountdown(value,id) { return request("/countdowns"+(id?"/"+encodeURIComponent(id):""),{method:id?"PATCH":"POST",body:JSON.stringify(value)}); },
+  deleteCountdown(id) { return request("/countdowns/"+encodeURIComponent(id),{method:"DELETE"}); },
   publicBanner() { return request("/public/banner"); },
   bannerSettings() { return request("/settings/banner"); },
   saveBanner(value) { return request("/settings/banner", { method: "PUT", body: JSON.stringify(value) }); },

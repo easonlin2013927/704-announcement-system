@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.5.1 >/dev/null 2>&1; then
-            gh release create v0.5.1 --target "$GITHUB_SHA" --title "v0.5.1 管理員狀態檢查與載入修正" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.6.0 >/dev/null 2>&1; then
+            gh release create v0.6.0 --target "$GITHUB_SHA" --title "v0.6.0 活動倒數與編輯器修正" --notes-file deploy/RELEASE.md
           fi

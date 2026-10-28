@@ -102,7 +102,20 @@ const server = createServer(async (req,res) => {
  const result = await db.query("select count(*)::int as total from announcements704");
  return send(200,{status:"ok",announcements:result.rows[0].total});
  }
- if (path === "/announcements" && req.method === "GET") return send(200,(await db.query("select * from announcements704 order by pinned desc,date desc")).rows);
+ if(path === "/countdowns" && req.method === "GET") return send(200,(await db.query("select * from countdowns704 order by target_at")).rows);
+ const countdownMatch=path.match(/^\/countdowns\/([0-9a-f-]{36})$/i);
+ if(path === "/countdowns" || countdownMatch){
+ if(!["teacher","admin"].includes(user.role)) fail(403,"僅限教師或管理員管理倒數活動");
+ if((path === "/countdowns" && req.method === "POST") || (countdownMatch && req.method === "PATCH")){
+ const b=await body(req); const date=new Date(b.target_at);
+ if(typeof b.title!=="string" || !b.title.trim() || b.title.length>80 || typeof b.target_at!=="string" || !Number.isFinite(date.getTime())) fail(400,"請輸入活動名稱與有效時間");
+ const row=countdownMatch ? await db.query("update countdowns704 set title=$1,target_at=$2 where id=$3 returning *",[b.title.trim(),date.toISOString(),countdownMatch[1]]) : await db.query("insert into countdowns704(id,title,target_at) values($1,$2,$3) returning *",[randomUUID(),b.title.trim(),date.toISOString()]);
+ if(!row.rowCount) fail(404,"找不到活動"); return send(200,row.rows[0]);
+ }
+ if(countdownMatch && req.method==="DELETE"){await db.query("delete from countdowns704 where id=$1",[countdownMatch[1]]);return send(200,{ok:true});}
+ fail(404,"找不到此功能");
+ }
+ if (path === "/announcements" && req.method === "GET") return send(200,(await db.query(user.role !== "student" ? "select * from announcements704 order by pinned desc,date desc" : "select * from announcements704 where audience=$1 or audience='全部人員' or audience in ('全校學生','七年級','八年級','九年級') order by pinned desc,date desc", user.role !== "student" ? [] : [user.role === "teacher" ? "教師" : "學生"])).rows);
  if (!["teacher","admin"].includes(user.role)) fail(403,"僅限教師或管理員管理公告");
  const match = path.match(/^\/announcements\/([0-9a-f-]{36})$/i);
  if ((path === "/announcements" && req.method === "POST") || (match && req.method === "PATCH")) {
