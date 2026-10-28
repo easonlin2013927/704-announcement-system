@@ -1,6 +1,6 @@
 # 學生使用手冊
 
-[前往學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.4.1#/student/login)
+[前往學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.0#/student/login)
 
 這份手冊只說明學生閱讀公告的操作。請向班級管理員取得正式網站網址及個人帳號。
 

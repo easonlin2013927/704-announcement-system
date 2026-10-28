@@ -1,4 +1,4 @@
-import { cloud } from "./cloud.js?v=0.4.1";
+import { cloud } from "./cloud.js?v=0.5.0";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
@@ -24,6 +24,9 @@ const state = {
   session: null,
   settingsOpen: false,
   banner: { enabled: false, content: "" },
+  accounts: [],
+  adminView: "dashboard",
+  marquee: { enabled: false, content: "" },
   announcements: [],
   search: "",
   category: "all",
@@ -127,7 +130,7 @@ function toast(message, tone = "success") {
 function render() {
   if (!state.session) return renderLogin();
   if (state.settingsOpen) return renderSettings();
-  if (state.session.role === "admin") return renderMaintenance();
+  if (state.adminView === "accounts" && state.session.role === "admin") return renderAccounts();
   if (state.editingId !== null) return renderEditor();
   if (state.selectedId) return renderDetail();
   return renderDashboard();
@@ -139,6 +142,7 @@ function renderLogin() {
   app.innerHTML = `
     <main class="login-shell">
       <header class="login-masthead"><span class="portal-emblem">704</span><span>704公告系統</span><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
+      ${state.marquee.enabled && state.marquee.content ? `<div class="login-marquee site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}
       <div class="login-center">
         <section class="login-slogan rich-content" aria-label="登入標語" ${state.banner.enabled && stripHtml(state.banner.content).trim() ? "" : "hidden"}>${sanitizeHtml(state.banner.content)}</section>
       <section class="login-panel">
@@ -165,7 +169,7 @@ function renderLogin() {
     try {
       const profile = await cloud.login(data.get("account"), data.get("password"), activeRole);
       if (profile.role !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
-      if (activeRole !== "admin") state.announcements = await cloud.list();
+      state.announcements = await cloud.list();
       state.session = { ...profile, name: profile.display_name };
       state.selectedId = null;
       state.editingId = null;
@@ -182,11 +186,12 @@ function headerTemplate() {
       <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>校園公告</small></span></button>
       <nav class="top-actions">
         <span class="role-chip">${portals[state.session.role].label}端</span>
-        <div class="user-block"><span class="avatar">${escapeHtml(state.session.name.charAt(0))}</span><span><strong>${escapeHtml(state.session.name)}</strong><small>${isTeacher ? "公告管理" : "704"}</small></span></div>
+        <div class="user-block"><span class="avatar">${escapeHtml(state.session.name.charAt(0))}</span><span><strong>${escapeHtml(state.session.name)}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
+${state.session.role === "admin" ? '<button class="secondary-button" id="open-accounts">帳號管理</button>' : ""}
 ${["teacher","admin"].includes(state.session.role) ? '<button class="secondary-button" id="open-settings">設定</button>' : ""}
         <button class="icon-button" id="logout" title="登出">${icon("logout")}</button>
       </nav>
-    </header>`;
+    </header>${state.marquee.enabled && state.marquee.content ? `<div class="site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}`;
 }
 
 function renderMaintenance() {
@@ -212,8 +217,31 @@ function renderMaintenance() {
   check();
 }
 
+function renderAccounts() {
+  app.innerHTML = `${headerTemplate()}<main class="editor-shell">
+    <button class="back-button" id="accounts-back">${icon("back",18)} 返回管理首頁</button>
+    <div class="editor-heading"><span class="eyebrow dark">ACCOUNT ADMINISTRATION</span><h1>帳號管理</h1><p>建立學生、教師與管理員帳號；教師與學生使用電子郵件登入，管理員可使用不含 @ 的維護帳號。</p></div>
+    <form class="editor-card" id="account-form"><h2>新增帳號</h2><div class="form-grid">
+      <label>登入帳號<input name="email" required maxlength="254" placeholder="學生／教師輸入電子郵件；管理員可用維護帳號"></label>
+      <label>顯示姓名<input name="name" required maxlength="80"></label>
+      <label>角色<select name="role"><option value="student">學生</option><option value="teacher">教師</option><option value="admin">管理員</option></select></label>
+      <label>初始密碼<input name="password" required minlength="10" maxlength="512" type="password" autocomplete="new-password"></label>
+    </div><footer class="editor-footer"><span>密碼至少 10 字元，請安全地將登入資料交給本人。</span><button class="primary-button">建立帳號</button></footer></form>
+    <section class="editor-card"><h2>現有帳號</h2><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section>
+  </main>`;
+  bindHeader();
+  document.querySelector("#accounts-back").addEventListener("click", () => { state.adminView="dashboard"; render(); });
+  const message=document.querySelector("#accounts-message"), list=document.querySelector("#accounts-list");
+  const refresh=async()=>{ try { state.accounts=await cloud.accounts(); list.innerHTML=state.accounts.map(account=>`<div class="account-row" data-account="${account.id}"><strong>${escapeHtml(account.display_name)}</strong><span>${escapeHtml(account.email)}</span><select aria-label="${escapeHtml(account.display_name)}角色"><option value="student" ${account.role==="student"?"selected":""}>學生</option><option value="teacher" ${account.role==="teacher"?"selected":""}>教師</option><option value="admin" ${account.role==="admin"?"selected":""}>管理員</option></select><button class="danger-button" data-remove-account="${account.id}">刪除</button></div>`).join("")||"<p>尚無帳號。</p>"; message.textContent=""; } catch(error){message.textContent=error.message;} };
+  document.querySelector("#account-form").addEventListener("submit",async event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget));try{await cloud.createAccount(data);event.currentTarget.reset();toast("帳號已建立");await refresh();}catch(error){toast(error.message,"error");}});
+  list.addEventListener("change",async event=>{if(!event.target.matches("select"))return;const row=event.target.closest("[data-account]");const account=state.accounts.find(item=>item.id===row.dataset.account);try{await cloud.updateAccount(account.id,{name:account.display_name,role:event.target.value});toast("角色已更新");await refresh();}catch(error){toast(error.message,"error");await refresh();}});
+  list.addEventListener("click",async event=>{const button=event.target.closest("[data-remove-account]");if(!button)return;const account=state.accounts.find(item=>item.id===button.dataset.removeAccount);if(!window.confirm(`確定刪除帳號「${account.display_name}」？`))return;try{await cloud.deleteAccount(account.id);toast("帳號已刪除");await refresh();}catch(error){toast(error.message,"error");}});
+  refresh();
+}
+
 function bindHeader() {
   document.querySelector("#open-settings")?.addEventListener("click", () => { state.settingsOpen = true; render(); });
+  document.querySelector("#open-accounts")?.addEventListener("click", () => { state.adminView="accounts"; render(); });
   document.querySelector("[data-home]")?.addEventListener("click", () => {
     state.selectedId = null;
     state.editingId = null;
@@ -240,7 +268,7 @@ function filteredAnnouncements() {
 }
 
 function renderDashboard() {
-  const isTeacher = state.session.role === "teacher";
+  const isTeacher = ["teacher","admin"].includes(state.session.role);
   const results = filteredAnnouncements();
   app.innerHTML = `
     ${headerTemplate()}
@@ -298,7 +326,7 @@ function renderDetail() {
   const item = state.announcements.find((entry) => entry.id === state.selectedId);
   if (!item) { state.selectedId = null; return render(); }
   const category = categories[item.category];
-  const isTeacher = state.session.role === "teacher";
+  const isTeacher = ["teacher","admin"].includes(state.session.role);
   app.innerHTML = `${headerTemplate()}<main class="article-shell">
     <button class="back-button" id="back">${icon("back", 18)} 返回公告列表</button>
     <article class="article-paper">
@@ -414,12 +442,16 @@ function bindRichEditor() {
 async function refreshBanner() {
   try {
     state.banner = await cloud.publicBanner();
+    state.marquee = { enabled: state.banner.marqueeEnabled, content: state.banner.marquee || "" };
     if (!state.session) {
       const slogan = document.querySelector(".login-slogan");
       if (slogan) {
         slogan.innerHTML = sanitizeHtml(state.banner.content);
         slogan.hidden = !state.banner.enabled || !stripHtml(state.banner.content).trim();
       }
+      const masthead=document.querySelector(".login-masthead");
+      document.querySelector(".login-marquee")?.remove();
+      if(masthead && state.marquee.enabled && state.marquee.content){const ticker=document.createElement("div");ticker.className="login-marquee site-marquee";ticker.innerHTML=`<strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee>`;masthead.after(ticker);}
     }
   } catch {
     // Login remains usable if the public banner endpoint is temporarily unavailable.
@@ -438,6 +470,7 @@ function renderSettings() {
       <p class="muted">標語會公開顯示在登入卡片上方，請勿放入學生個資或密碼。</p>
       <h2 class="preview-label">顯示預覽</h2><div id="banner-preview" class="login-slogan rich-content"></div></div>
       <footer class="editor-footer"><span>儲存後，新開啟登入頁即可看見更新。</span><button id="save-banner" class="primary-button">儲存設定</button></footer>
+      ${state.session.role === "admin" ? `<hr><h2>網站頂端跑馬公告</h2><label class="switch-row"><input id="marquee-enabled" type="checkbox"><span class="switch"></span><span><strong>顯示全站跑馬公告</strong><small>公告會顯示在登入頁與已登入頁面的最上方。</small></span></label><label class="editor-label" for="marquee-content">跑馬公告文字</label><textarea id="marquee-content" maxlength="1000" rows="3" placeholder="輸入要公告給全站的短訊息"></textarea><div class="editor-footer"><span>最多 1000 字；停用後內容仍會保留。</span><button id="save-marquee" class="secondary-button">儲存跑馬公告</button></div>` : ""}
     </div></section></main>`;
   bindHeader();
   document.querySelector("#close-settings").addEventListener("click", () => { state.settingsOpen = false; render(); });
@@ -459,6 +492,8 @@ function renderSettings() {
     fields.hidden = false;
     message.textContent = "";
   }).catch(error => { message.textContent = error.message; });
+  if(state.session.role === "admin") cloud.marqueeSettings().then(value=>{const toggle=document.querySelector("#marquee-enabled"),input=document.querySelector("#marquee-content");if(toggle&&input){toggle.checked=value.enabled;input.value=value.content;}}).catch(error=>{message.textContent=error.message;});
+  document.querySelector("#save-marquee")?.addEventListener("click",async event=>{const button=event.currentTarget;button.disabled=true;try{const value=await cloud.saveMarquee({enabled:document.querySelector("#marquee-enabled").checked,content:document.querySelector("#marquee-content").value});state.marquee=value;toast("跑馬公告設定已儲存");render();}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
   document.querySelector("#save-banner").addEventListener("click", async (event) => {
     const button = event.currentTarget;
     if (enabled.checked && !stripHtml(editor.innerHTML).trim()) { toast("請輸入標語內容，或停用標語", "error"); return; }

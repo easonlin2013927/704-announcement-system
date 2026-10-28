@@ -43,4 +43,10 @@ export const cloud = {
   publicBanner() { return request("/public/banner"); },
   bannerSettings() { return request("/settings/banner"); },
   saveBanner(value) { return request("/settings/banner", { method: "PUT", body: JSON.stringify(value) }); },
+  marqueeSettings() { return request("/settings/marquee"); },
+  saveMarquee(value) { return request("/settings/marquee", { method: "PUT", body: JSON.stringify(value) }); },
+  accounts() { return request("/admin/accounts"); },
+  createAccount(value) { return request("/admin/accounts", { method: "POST", body: JSON.stringify(value) }); },
+  updateAccount(id, value) { return request("/admin/accounts/" + encodeURIComponent(id), { method: "PATCH", body: JSON.stringify(value) }); },
+  deleteAccount(id) { return request("/admin/accounts/" + encodeURIComponent(id), { method: "DELETE" }); },
 };

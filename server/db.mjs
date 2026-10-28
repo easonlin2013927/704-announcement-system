@@ -15,6 +15,10 @@ export async function migrate() {
  id integer primary key check (id=1), enabled boolean not null default false,
  content text not null default '', updated_at timestamptz not null default now());
  insert into login_banner704 (id) values(1) on conflict do nothing;`);
+ await db.query(`create table if not exists site_marquee704 (
+ id integer primary key check (id=1), enabled boolean not null default false,
+ content text not null default '', updated_at timestamptz not null default now());
+ insert into site_marquee704 (id) values(1) on conflict do nothing;`);
  // Atomic constraint migration preserves existing accounts and announcements.
  await db.query(`begin;
  alter table accounts704 drop constraint if exists accounts704_role_check;

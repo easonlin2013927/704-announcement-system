@@ -29,7 +29,8 @@ const server = createServer(async (req,res) => {
  if (path === "/health" && req.method === "GET") { await db.query("select 1"); return send(200,{status:"ok"}); }
  if (path === "/public/banner" && req.method === "GET") {
  const banner=(await db.query("select enabled,content from login_banner704 where id=1")).rows[0];
- return send(200,{enabled:banner.enabled,content:banner.enabled ? banner.content : ""});
+ const marquee=(await db.query("select enabled,content from site_marquee704 where id=1")).rows[0];
+ return send(200,{enabled:banner.enabled,content:banner.enabled ? banner.content : "",marqueeEnabled:marquee.enabled,marquee:marquee.enabled ? marquee.content : ""});
  }
  if (path === "/login" && req.method === "POST") {
  const data = await body(req);
@@ -60,13 +61,50 @@ const server = createServer(async (req,res) => {
  const result=await db.query("update login_banner704 set enabled=$1,content=$2,updated_at=now() where id=1 returning enabled,content",[value.enabled,value.content]);
  return send(200,result.rows[0]);
  }
+ if (path === "/settings/marquee" && ["GET","PUT"].includes(req.method)) {
+ if (user.role !== "admin") fail(403,"僅限管理員設定跑馬公告");
+ if(req.method==="GET") return send(200,(await db.query("select enabled,content from site_marquee704 where id=1")).rows[0]);
+ const value=await body(req);
+ if(typeof value.enabled!=="boolean" || typeof value.content!=="string" || value.content.length>1000) fail(400,"跑馬公告格式錯誤或超過 1000 字元");
+ const result=await db.query("update site_marquee704 set enabled=$1,content=$2,updated_at=now() where id=1 returning enabled,content",[value.enabled,value.content.trim()]);
+ return send(200,result.rows[0]);
+ }
+ if (path === "/admin/accounts" && ["GET","POST"].includes(req.method)) {
+ if(user.role!=="admin") fail(403,"僅限管理員管理帳號");
+ if(req.method==="GET") return send(200,(await db.query("select id,email,display_name,role from accounts704 order by role,display_name")).rows);
+ const value=await body(req);
+ const email=typeof value.email==="string"?value.email.trim().toLowerCase():"";
+ const name=typeof value.name==="string"?value.name.trim():"";
+ if(!email || email.length>254 || (value.role==="admin" ? email.includes("@") : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) || !name || name.length>80 || !["student","teacher","admin"].includes(value.role) || typeof value.password!=="string" || value.password.length<10 || value.password.length>512) fail(400,"請確認帳號、姓名、角色與密碼（至少 10 字）");
+ const {hash}=await import("./password.mjs");
+ const result=await db.query("insert into accounts704(id,email,display_name,role,password_hash) values($1,$2,$3,$4,$5) on conflict(email) do nothing returning id,email,display_name,role",[randomUUID(),email,name,value.role,await hash(value.password)]);
+ if(!result.rowCount) fail(409,"此帳號已存在");
+ return send(201,result.rows[0]);
+ }
+ const accountMatch=path.match(/^\/admin\/accounts\/([0-9a-f-]{36})$/i);
+ if(accountMatch && ["PATCH","DELETE"].includes(req.method)) {
+ if(user.role!=="admin") fail(403,"僅限管理員管理帳號");
+ const target=(await db.query("select id,email,display_name,role from accounts704 where id=$1",[accountMatch[1]])).rows[0];
+ if(!target) fail(404,"找不到帳號");
+ if(req.method==="PATCH") {
+ const value=await body(req); const name=typeof value.name==="string"?value.name.trim():"";
+ if(!name || name.length>80 || !["student","teacher","admin"].includes(value.role)) fail(400,"姓名或角色格式錯誤");
+ if(target.id===user.id && value.role!=="admin") fail(400,"不能移除自己最後的管理員身分");
+ if(target.role==="admin" && value.role!=="admin" && Number((await db.query("select count(*)::int as total from accounts704 where role='admin'")).rows[0].total)<=1) fail(400,"至少需保留一位管理員");
+ const result=await db.query("update accounts704 set display_name=$1,role=$2 where id=$3 returning id,email,display_name,role",[name,value.role,target.id]);
+ return send(200,result.rows[0]);
+ }
+ if(target.id===user.id) fail(400,"不能刪除目前登入的帳號");
+ if(target.role==="admin" && Number((await db.query("select count(*)::int as total from accounts704 where role='admin'")).rows[0].total)<=1) fail(400,"至少需保留一位管理員");
+ await db.query("delete from accounts704 where id=$1",[target.id]); return send(200,{ok:true});
+ }
  if (path === "/admin/status" && req.method === "GET") {
  if (user.role !== "admin") fail(403,"僅限維護人員");
  const result = await db.query("select count(*)::int as total from announcements704");
  return send(200,{status:"ok",announcements:result.rows[0].total});
  }
  if (path === "/announcements" && req.method === "GET") return send(200,(await db.query("select * from announcements704 order by pinned desc,date desc")).rows);
- if (user.role !== "teacher") fail(403,"僅限教師管理公告");
+ if (!["teacher","admin"].includes(user.role)) fail(403,"僅限教師或管理員管理公告");
  const match = path.match(/^\/announcements\/([0-9a-f-]{36})$/i);
  if ((path === "/announcements" && req.method === "POST") || (match && req.method === "PATCH")) {
  const b = await body(req);

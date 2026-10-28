@@ -1,18 +1,20 @@
 # 704公告系統
 
+管理員除了教師的公告管理、富文字編輯與登入標語設定，還可建立學生／教師／管理員帳號、調整角色、刪除帳號，以及設定所有頁面頂端的跑馬公告。帳號與跑馬公告均儲存在 PostgreSQL；最後一位管理員與目前登入中的管理員帳號受到保護。詳見[管理員手冊](docs/wiki/Maintenance-Guide.md)。
+
 教師發布富文字公告，學生登入閱讀；前端使用 GitHub Pages，後端為自架 Node.js API 與 PostgreSQL，透過 Cloudflare Tunnel 提供 HTTPS。
 
 ## 各系統登入網址
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.4.1#/student/login) | 閱讀、搜尋及分類公告 |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.4.1#/teacher/login) | 發布、編輯、刪除與置頂公告 |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.4.1#/admin/login) | 查看 API、資料庫狀態與公告數量 |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.0#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.0#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.0#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
 
 三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
 
-管理員不是教師帳號，維護端不提供公告寫入功能。帳號建立、角色調整、密碼重設與備份目前使用主機端工具。尚未配發正式帳號，請先聯絡管理員建立。
+管理員擁有教師的公告管理與登入標語設定功能，並可建立學生、教師及管理員帳號、調整角色、刪除帳號與編輯全站跑馬公告。詳細步驟請閱讀[維護人員手冊](docs/wiki/Maintenance-Guide.md)。
 
 ## 操作文件
 
