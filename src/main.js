@@ -1,4 +1,4 @@
-import { cloud } from "./cloud.js?v=0.9.0";
+import { cloud } from "./cloud.js?v=0.9.1";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
@@ -282,7 +282,7 @@ function renderAccounts() {
  }catch(error){toast(error.message,"error");}finally{button.disabled=false;}
  });
  list.addEventListener("click",async event=>{
- const edit=event.target.closest("[data-edit-account]");if(edit){open(state.accounts.find(account=>account.id===edit.dataset.editAccount));return;}
+ const edit=event.target.closest("[data-edit-account]");if(edit){edit.disabled=true;try{state.accounts=await cloud.accounts();const account=state.accounts.find(item=>item.id===edit.dataset.editAccount);if(!account)throw new Error("帳號已不存在，請重新開啟名單");open(account);}catch(error){toast(error.message,"error");}finally{edit.disabled=false;}return;}
  const button=event.target.closest("[data-remove-account]");if(!button)return;
  const account=state.accounts.find(item=>item.id===button.dataset.removeAccount);
  if(!window.confirm(`確定刪除帳號「${account.display_name}」？`))return;
