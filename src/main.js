@@ -1,4 +1,4 @@
-import { cloud } from "./cloud.js?v=0.4.0";
+import { cloud } from "./cloud.js?v=0.4.1";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
@@ -60,7 +60,7 @@ function sanitizeHtml(html = "") {
       return;
     }
 
-    const highlight = ["SPAN", "FONT"].includes(element.tagName) ? element.style.backgroundColor : "";
+    const highlight = element.style.backgroundColor;
     const href = element.tagName === "A" ? element.getAttribute("href") : null;
     [...element.attributes].forEach((attribute) => element.removeAttribute(attribute.name));
 

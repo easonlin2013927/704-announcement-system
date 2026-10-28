@@ -34,6 +34,7 @@ input:focus,select:focus { border-color: #9380f0 !important; box-shadow: 0 0 0 3
 .login-slogan a { color: #bba7ff !important; }
 .login-slogan ul,.login-slogan ol { display: inline-block; text-align: left; }
 .login-slogan mark,.login-slogan span[style] { color: #242034; }
+.rich-content [style*="background-color"],.rich-editor [style*="background-color"] { color: #242034; }
 .login-slogan blockquote { color: #e6ddff !important; background: #ffffff06 !important; border-color: #9f85f4 !important; }
 .topbar { background: #14121dea !important; }
 .wordmark { color: #eeeaf8 !important; }
