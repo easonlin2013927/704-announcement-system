@@ -1,0 +1,22 @@
+name: 使用請教
+description: 操作方式、帳號或使用流程的疑問
+title: "[請教] "
+body:
+  - type: dropdown
+    id: role
+    attributes:
+      label: 使用身分
+      options: [學生, 教師, 管理員]
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: 想請教的問題
+      description: 請說明想完成的事情、目前操作到哪一步，以及讀過哪一段手冊。
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已嘗試的方法（選填）

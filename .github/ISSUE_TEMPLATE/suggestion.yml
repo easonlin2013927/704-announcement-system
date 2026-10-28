@@ -1,0 +1,20 @@
+name: 網站建議
+description: 提出功能、介面或無障礙改善建議
+title: "[建議] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解決的使用情境
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 希望如何改善
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 替代方法、參考畫面或影響範圍（選填）

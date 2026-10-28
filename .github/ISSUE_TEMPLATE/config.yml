@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 學生使用手冊
+    url: https://github.com/easonlin2013927/704-announcement-system/blob/main/docs/wiki/Student-Guide.md
+    about: 學生閱讀公告與常見問題
+  - name: 教師使用手冊
+    url: https://github.com/easonlin2013927/704-announcement-system/blob/main/docs/wiki/Teacher-Guide.md
+    about: 教師發布與管理公告

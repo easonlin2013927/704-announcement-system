@@ -1,0 +1,37 @@
+name: 問題回報
+description: 回報網頁錯誤、顯示異常或功能失效
+title: "[問題] "
+body:
+  - type: markdown
+    attributes:
+      value: 請勿提交密碼、學生個資或完整班級名冊。截圖請先遮蔽個資。
+  - type: dropdown
+    id: role
+    attributes:
+      label: 使用身分
+      options: [學生, 教師, 管理員]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 重現步驟
+      description: 請依序描述進入哪一頁、按了什麼、出現什麼結果。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 預期結果與實際結果
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: 裝置、作業系統與瀏覽器版本
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 錯誤訊息、發生時間與截圖（選填）
