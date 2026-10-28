@@ -1,5 +1,7 @@
 # 管理員設定與維護
 
+> 自架版本 0.2.0 起，請依照 [1Panel 部署手冊](../../deploy/README.md) 使用自架 PostgreSQL 與 Node.js API。以下 Supabase 步驟為舊版本，不適用目前前端。不要執行 supabase/schema.sql；新 API 自動建立帶有 704 後綴的專用資料表。
+
 ## 必要服務
 
 GitHub Pages 提供靜態前端，Supabase 提供帳號驗證與 PostgreSQL 資料庫。尚未連接 Supabase 前，網站不能登入或發布。GitHub repository 不是公告資料庫。

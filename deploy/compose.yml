@@ -1,0 +1,19 @@
+services:
+  api704:
+    build: ../server
+    container_name: api704
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7040:7040"
+    env_file: .env
+    networks:
+      - database
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:7040/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+networks:
+  database:
+    external: true
+    name: ${DB_NETWORK:?Set DB_NETWORK in .env}
