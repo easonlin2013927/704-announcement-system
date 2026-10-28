@@ -10,7 +10,11 @@ export async function migrate() {
  audience text not null, date timestamptz not null default now(), pinned boolean not null default false, content text not null);
  create table if not exists sessions704 (
  token_hash text primary key, account_id uuid not null references accounts704(id) on delete cascade,
- expires_at timestamptz not null);`);
+ expires_at timestamptz not null);
+ create table if not exists login_banner704 (
+ id integer primary key check (id=1), enabled boolean not null default false,
+ content text not null default '', updated_at timestamptz not null default now());
+ insert into login_banner704 (id) values(1) on conflict do nothing;`);
  // Atomic constraint migration preserves existing accounts and announcements.
  await db.query(`begin;
  alter table accounts704 drop constraint if exists accounts704_role_check;

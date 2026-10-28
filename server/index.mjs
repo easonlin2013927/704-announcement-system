@@ -20,13 +20,17 @@ const server = createServer(async (req,res) => {
  if (req.headers.origin === origin) {
  res.setHeader("Access-Control-Allow-Origin",origin);
  res.setHeader("Access-Control-Allow-Headers","Content-Type, Authorization");
- res.setHeader("Access-Control-Allow-Methods","GET, POST, PATCH, DELETE, OPTIONS");
+ res.setHeader("Access-Control-Allow-Methods","GET, POST, PUT, PATCH, DELETE, OPTIONS");
  }
  try {
  if (req.headers.origin && req.headers.origin !== origin) fail(403,"來源不被允許");
  if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
  const path = new URL(req.url,"http://localhost").pathname;
  if (path === "/health" && req.method === "GET") { await db.query("select 1"); return send(200,{status:"ok"}); }
+ if (path === "/public/banner" && req.method === "GET") {
+ const banner=(await db.query("select enabled,content from login_banner704 where id=1")).rows[0];
+ return send(200,{enabled:banner.enabled,content:banner.enabled ? banner.content : ""});
+ }
  if (path === "/login" && req.method === "POST") {
  const data = await body(req);
  const email = typeof data.email === "string" ? data.email.trim().toLowerCase() : "";
@@ -48,6 +52,14 @@ const server = createServer(async (req,res) => {
  const user = (await db.query("select a.id,a.role,a.display_name from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now()",[digest(token)])).rows[0];
  if (!user) fail(401,"登入已失效，請重新登入");
  if (path === "/logout" && req.method === "POST") { await db.query("delete from sessions704 where token_hash=$1",[digest(token)]); return send(200,{ok:true}); }
+ if (path === "/settings/banner" && ["GET","PUT"].includes(req.method)) {
+ if (!["teacher","admin"].includes(user.role)) fail(403,"僅限教師或維護人員設定標語");
+ if(req.method==="GET") return send(200,(await db.query("select enabled,content from login_banner704 where id=1")).rows[0]);
+ const value=await body(req);
+ if(typeof value.enabled!=="boolean" || typeof value.content!=="string" || value.content.length>20000) fail(400,"標語格式錯誤或超過 20000 字元");
+ const result=await db.query("update login_banner704 set enabled=$1,content=$2,updated_at=now() where id=1 returning enabled,content",[value.enabled,value.content]);
+ return send(200,result.rows[0]);
+ }
  if (path === "/admin/status" && req.method === "GET") {
  if (user.role !== "admin") fail(403,"僅限維護人員");
  const result = await db.query("select count(*)::int as total from announcements704");

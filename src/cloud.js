@@ -40,4 +40,7 @@ export const cloud = {
     await request("/announcements/" + encodeURIComponent(id), { method: "DELETE" });
   },
   status() { return request("/admin/status"); },
+  publicBanner() { return request("/public/banner"); },
+  bannerSettings() { return request("/settings/banner"); },
+  saveBanner(value) { return request("/settings/banner", { method: "PUT", body: JSON.stringify(value) }); },
 };

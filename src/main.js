@@ -1,10 +1,11 @@
-import { cloud } from "./cloud.js?v=0.3.1";
+import { cloud } from "./cloud.js?v=0.4.0";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
 window.addEventListener("hashchange", () => {
   cloud.logout();
   state.session = null;
+  state.settingsOpen = false;
   state.selectedId = null;
   state.editingId = null;
   activeRole = portalRole(location.hash);
@@ -21,6 +22,8 @@ const categories = {
 
 const state = {
   session: null,
+  settingsOpen: false,
+  banner: { enabled: false, content: "" },
   announcements: [],
   search: "",
   category: "all",
@@ -123,6 +126,7 @@ function toast(message, tone = "success") {
 
 function render() {
   if (!state.session) return renderLogin();
+  if (state.settingsOpen) return renderSettings();
   if (state.session.role === "admin") return renderMaintenance();
   if (state.editingId !== null) return renderEditor();
   if (state.selectedId) return renderDetail();
@@ -134,19 +138,12 @@ function renderLogin() {
   document.title = portal.title + "｜704公告系統";
   app.innerHTML = `
     <main class="login-shell">
-      <section class="login-brand">
-        <div class="brand-mark large">知</div>
-        <div class="brand-copy">
-          <span class="eyebrow">CAMPUS BULLETIN</span>
-          <h1>每一則重要消息，<br><em>都能被好好看見。</em></h1>
-          <p>簡潔、即時、易讀的校園公告空間，讓教師安心發布，讓學生不再錯過。</p>
-        </div>
-        <div class="brand-orbit orbit-one"></div><div class="brand-orbit orbit-two"></div>
-      </section>
+      <header class="login-masthead"><span class="portal-emblem">704</span><span>704公告系統</span><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
+      <div class="login-center">
+        <section class="login-slogan rich-content" aria-label="登入標語" ${state.banner.enabled && stripHtml(state.banner.content).trim() ? "" : "hidden"}>${sanitizeHtml(state.banner.content)}</section>
       <section class="login-panel">
         <div class="login-card">
-          <div class="mobile-logo"><div class="brand-mark">知</div><strong>704公告系統</strong></div>
-          <span class="eyebrow dark">${portal.eyebrow}</span>
+          <div class="portal-pill"><span></span>${portal.eyebrow}</div>
           <h2>${portal.title}</h2>
           <p class="muted">${portal.description}</p>
           <form id="login-form">
@@ -157,6 +154,7 @@ function renderLogin() {
           <p class="helper">${activeRole === "admin" ? "使用維護人員專用帳號登入。" : "使用管理員提供的電子郵件與密碼登入。公告儲存於雲端。"}</p>
         </div>
       </section>
+      </div><footer class="login-footnote">704 ANNOUNCEMENT SYSTEM <span>讓每一則消息，清楚抵達。</span></footer>
     </main>`;
 
   document.querySelector("#login-form").addEventListener("submit", async (event) => {
@@ -184,7 +182,8 @@ function headerTemplate() {
       <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">知</span><span><strong>704公告系統</strong><small>校園公告</small></span></button>
       <nav class="top-actions">
         <span class="role-chip">${portals[state.session.role].label}端</span>
-        <div class="user-block"><span class="avatar">${isTeacher ? "林" : "陳"}</span><span><strong>${escapeHtml(state.session.name)}</strong><small>${isTeacher ? "公告管理" : "704"}</small></span></div>
+        <div class="user-block"><span class="avatar">${escapeHtml(state.session.name.charAt(0))}</span><span><strong>${escapeHtml(state.session.name)}</strong><small>${isTeacher ? "公告管理" : "704"}</small></span></div>
+${["teacher","admin"].includes(state.session.role) ? '<button class="secondary-button" id="open-settings">設定</button>' : ""}
         <button class="icon-button" id="logout" title="登出">${icon("logout")}</button>
       </nav>
     </header>`;
@@ -214,9 +213,11 @@ function renderMaintenance() {
 }
 
 function bindHeader() {
+  document.querySelector("#open-settings")?.addEventListener("click", () => { state.settingsOpen = true; render(); });
   document.querySelector("[data-home]")?.addEventListener("click", () => {
     state.selectedId = null;
     state.editingId = null;
+    state.settingsOpen = false;
     render();
   });
   document.querySelector("#logout")?.addEventListener("click", () => {
@@ -224,7 +225,9 @@ function bindHeader() {
     state.selectedId = null;
     state.editingId = null;
     cloud.logout();
+    state.settingsOpen = false;
     render();
+    refreshBanner();
   });
 }
 
@@ -323,15 +326,7 @@ function renderEditor() {
         <label>公告對象<select name="audience">${["全校學生", "七年級", "八年級", "九年級"].map((value) => `<option ${existing?.audience === value ? "selected" : ""}>${value}</option>`).join("")}</select></label>
       </div>
       <label class="editor-label">公告內容</label>
-      <div class="rich-editor-wrap">
-        <div class="format-toolbar" role="toolbar" aria-label="文字格式">
-          <button type="button" data-command="bold" title="粗體">${icon("bold", 18)}</button><button type="button" data-command="italic" title="斜體">${icon("italic", 18)}</button><button type="button" data-command="underline" title="底線">${icon("underline", 18)}</button><span class="divider"></span>
-          <button type="button" data-command="insertUnorderedList" title="項目符號">${icon("list", 18)}</button><button type="button" data-command="insertOrderedList" title="編號清單">${icon("ordered", 18)}</button><button type="button" id="add-link" title="插入連結">${icon("link", 18)}</button><span class="divider"></span>
-          <label class="color-tool" title="螢光筆"><span class="highlight-icon">A</span><input type="color" id="highlight-color" value="#fef08a"></label>
-          <select id="block-format" aria-label="段落格式"><option value="p">一般文字</option><option value="h2">大標題</option><option value="h3">小標題</option><option value="blockquote">引用文字</option></select>
-        </div>
-        <div id="rich-editor" class="rich-editor" contenteditable="true" data-placeholder="在這裡輸入公告內容…">${existing?.content || ""}</div>
-      </div>
+      ${editorMarkup(existing?.content || "")}
       <div class="editor-options"><label class="switch-row"><input type="checkbox" name="pinned" ${existing?.pinned ? "checked" : ""}><span class="switch"></span><span><strong>置頂公告</strong><small>讓這則公告優先顯示在列表最上方</small></span></label></div>
       <footer class="editor-footer"><span>${icon("spark", 17)} 提示：善用螢光筆標示日期與重要事項</span><div><button type="button" class="secondary-button" id="cancel-edit-bottom">取消</button><button class="primary-button" type="submit">${existing ? "儲存變更" : "發布公告"}</button></div></footer>
     </form>
@@ -340,20 +335,7 @@ function renderEditor() {
   const cancel = () => { state.editingId = null; render(); };
   document.querySelector("#cancel-edit").addEventListener("click", cancel);
   document.querySelector("#cancel-edit-bottom").addEventListener("click", cancel);
-  const editor = document.querySelector("#rich-editor");
-  document.querySelectorAll("[data-command]").forEach((button) => button.addEventListener("mousedown", (event) => {
-    event.preventDefault(); document.execCommand(button.dataset.command, false); editor.focus();
-  }));
-  document.querySelector("#highlight-color").addEventListener("input", (event) => {
-    document.execCommand("hiliteColor", false, event.target.value); editor.focus();
-  });
-  document.querySelector("#block-format").addEventListener("change", (event) => {
-    document.execCommand("formatBlock", false, event.target.value); editor.focus();
-  });
-  document.querySelector("#add-link").addEventListener("mousedown", (event) => {
-    event.preventDefault(); const url = window.prompt("請輸入連結網址：", "https://");
-    if (url && /^https?:\/\//i.test(url)) document.execCommand("createLink", false, url);
-  });
+  const editor = bindRichEditor();
   document.querySelector("#editor-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
@@ -380,4 +362,118 @@ async function deleteAnnouncement(id) {
   state.selectedId = null; state.editingId = null; render(); toast("公告已刪除");
 }
 
+function editorMarkup(content = "") {
+  return `      <div class="rich-editor-wrap">
+        <div class="format-toolbar" role="toolbar" aria-label="文字格式">
+          <button type="button" data-command="bold" title="粗體">${icon("bold", 18)}</button><button type="button" data-command="italic" title="斜體">${icon("italic", 18)}</button><button type="button" data-command="underline" title="底線">${icon("underline", 18)}</button><span class="divider"></span>
+          <button type="button" data-command="insertUnorderedList" title="項目符號">${icon("list", 18)}</button><button type="button" data-command="insertOrderedList" title="編號清單">${icon("ordered", 18)}</button><button type="button" id="add-link" title="插入連結">${icon("link", 18)}</button><span class="divider"></span>
+          <button type="button" id="apply-highlight" title="螢光筆"><span class="highlight-icon">A</span></button><label class="color-tool" title="螢光筆顏色"><input type="color" id="highlight-color" aria-label="螢光筆顏色" value="#fef08a"></label>
+          <select id="block-format" aria-label="段落格式"><option value="p">一般文字</option><option value="h2">大標題</option><option value="h3">小標題</option><option value="blockquote">引用文字</option></select>
+        </div>
+        <div id="rich-editor" class="rich-editor" contenteditable="true" data-placeholder="在這裡輸入公告內容…">${sanitizeHtml(content)}</div>
+      </div>`;
+}
+
+function bindRichEditor() {
+  const editor = document.querySelector("#rich-editor");
+  let savedRange = null;
+  const capture = () => {
+    const selection = window.getSelection();
+    if (selection.rangeCount && editor.contains(selection.anchorNode)) savedRange = selection.getRangeAt(0).cloneRange();
+  };
+  editor.addEventListener("mouseup", capture);
+  editor.addEventListener("keyup", capture);
+  document.querySelector(".format-toolbar").addEventListener("pointerdown", capture);
+  const restore = () => {
+    editor.focus();
+    if (savedRange) { const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(savedRange); }
+  };
+  document.querySelectorAll("[data-command]").forEach((button) => button.addEventListener("mousedown", (event) => {
+    event.preventDefault(); document.execCommand(button.dataset.command, false); editor.focus();
+  }));
+  document.querySelector("#highlight-color").addEventListener("input", (event) => {
+    restore();
+    document.execCommand("hiliteColor", false, event.target.value); editor.focus();
+  });
+  document.querySelector("#apply-highlight").addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    document.execCommand("hiliteColor", false, document.querySelector("#highlight-color").value);
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  document.querySelector("#block-format").addEventListener("change", (event) => {
+    restore();
+    document.execCommand("formatBlock", false, event.target.value); editor.focus();
+  });
+  document.querySelector("#add-link").addEventListener("mousedown", (event) => {
+    event.preventDefault(); const url = window.prompt("請輸入連結網址：", "https://");
+    if (url && /^https?:\/\//i.test(url)) document.execCommand("createLink", false, url);
+  });
+  return editor;
+}
+
+async function refreshBanner() {
+  try {
+    state.banner = await cloud.publicBanner();
+    if (!state.session) {
+      const slogan = document.querySelector(".login-slogan");
+      if (slogan) {
+        slogan.innerHTML = sanitizeHtml(state.banner.content);
+        slogan.hidden = !state.banner.enabled || !stripHtml(state.banner.content).trim();
+      }
+    }
+  } catch {
+    // Login remains usable if the public banner endpoint is temporarily unavailable.
+  }
+}
+
+function renderSettings() {
+  app.innerHTML = `${headerTemplate()}<main class="editor-shell settings-shell">
+    <button class="back-button" id="close-settings">${icon("back",18)} 返回</button>
+    <div class="editor-heading"><span class="eyebrow dark">PORTAL SETTINGS</span><h1>登入頁設定</h1>
+    <p>教師與維護人員共用設定，會套用至三個登入入口。</p></div>
+    <section class="editor-card"><p id="settings-message" role="status">載入設定中…</p>
+    <div id="settings-fields" hidden>
+      <label class="switch-row"><input id="banner-enabled" type="checkbox"><span class="switch"></span><span><strong>啟用標語編輯器與登入標語</strong><small>停用會隱藏標語，已儲存的內容仍會保留。</small></span></label>
+      <div id="banner-editor-section" hidden><label class="editor-label" for="rich-editor">標語內容</label>${editorMarkup()}
+      <p class="muted">標語會公開顯示在登入卡片上方，請勿放入學生個資或密碼。</p>
+      <h2 class="preview-label">顯示預覽</h2><div id="banner-preview" class="login-slogan rich-content"></div></div>
+      <footer class="editor-footer"><span>儲存後，新開啟登入頁即可看見更新。</span><button id="save-banner" class="primary-button">儲存設定</button></footer>
+    </div></section></main>`;
+  bindHeader();
+  document.querySelector("#close-settings").addEventListener("click", () => { state.settingsOpen = false; render(); });
+  const message = document.querySelector("#settings-message");
+  const editor = bindRichEditor();
+  const fields = document.querySelector("#settings-fields");
+  const enabled = document.querySelector("#banner-enabled");
+  const section = document.querySelector("#banner-editor-section");
+  const preview = document.querySelector("#banner-preview");
+  const updatePreview = () => { preview.innerHTML = sanitizeHtml(editor.innerHTML); };
+  enabled.addEventListener("change", () => { section.hidden = !enabled.checked; });
+  editor.addEventListener("input", updatePreview);
+  cloud.bannerSettings().then(value => {
+    if (!fields.isConnected) return;
+    enabled.checked = value.enabled;
+    editor.innerHTML = sanitizeHtml(value.content);
+    updatePreview();
+    section.hidden = !value.enabled;
+    fields.hidden = false;
+    message.textContent = "";
+  }).catch(error => { message.textContent = error.message; });
+  document.querySelector("#save-banner").addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    if (enabled.checked && !stripHtml(editor.innerHTML).trim()) { toast("請輸入標語內容，或停用標語", "error"); return; }
+    const content = sanitizeHtml(editor.innerHTML);
+    if (content.length > 20000) { toast("標語內容過長，請縮短後再試", "error"); return; }
+    button.disabled = true;
+    try {
+      const value = await cloud.saveBanner({ enabled: enabled.checked, content });
+      state.banner = value;
+      toast("登入標語已儲存");
+      message.textContent = "設定已儲存至資料庫。";
+    } catch (error) { message.textContent = error.message; }
+    finally { button.disabled = false; }
+  });
+}
+
 render();
+refreshBanner();
