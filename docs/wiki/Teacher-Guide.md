@@ -1,6 +1,6 @@
 # 教師使用手冊
 
-[前往教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.0#/teacher/login)
+[前往教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.1#/teacher/login)
 
 本文件供已取得教師權限的使用者閱讀。教師帳號須由管理員建立，介面切換身分不會取得資料庫寫入權限。
 

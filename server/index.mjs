@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
 import { db, migrate } from "./db.mjs";
-import { verify, digest } from "./password.mjs";
+import { verify, digest, hash } from "./password.mjs";
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
@@ -76,7 +76,6 @@ const server = createServer(async (req,res) => {
  const email=typeof value.email==="string"?value.email.trim().toLowerCase():"";
  const name=typeof value.name==="string"?value.name.trim():"";
  if(!email || email.length>254 || (value.role==="admin" ? email.includes("@") : !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) || !name || name.length>80 || !["student","teacher","admin"].includes(value.role) || typeof value.password!=="string" || value.password.length<10 || value.password.length>512) fail(400,"請確認帳號、姓名、角色與密碼（至少 10 字）");
- const {hash}=await import("./password.mjs");
  const result=await db.query("insert into accounts704(id,email,display_name,role,password_hash) values($1,$2,$3,$4,$5) on conflict(email) do nothing returning id,email,display_name,role",[randomUUID(),email,name,value.role,await hash(value.password)]);
  if(!result.rowCount) fail(409,"此帳號已存在");
  return send(201,result.rows[0]);

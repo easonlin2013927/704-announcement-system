@@ -8,9 +8,9 @@
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.0#/student/login) | 閱讀、搜尋及分類公告 |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.0#/teacher/login) | 發布、編輯、刪除與置頂公告 |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.0#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.1#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.1#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.5.1#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
 
 三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
 

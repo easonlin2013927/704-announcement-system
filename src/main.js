@@ -1,4 +1,4 @@
-import { cloud } from "./cloud.js?v=0.5.0";
+import { cloud } from "./cloud.js?v=0.5.1";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
@@ -269,6 +269,7 @@ function filteredAnnouncements() {
 
 function renderDashboard() {
   const isTeacher = ["teacher","admin"].includes(state.session.role);
+  const isAdmin = state.session.role === "admin";
   const results = filteredAnnouncements();
   app.innerHTML = `
     ${headerTemplate()}
@@ -277,6 +278,7 @@ function renderDashboard() {
         <div><span class="eyebrow dark">${isTeacher ? "TEACHER CONSOLE" : "STUDENT BULLETIN"}</span><h1>${isTeacher ? "公告管理" : "校園最新公告"}</h1><p>${isTeacher ? "清楚傳遞每一項校園資訊。" : "今天也別忘了看看校園裡的新消息。"}</p></div>
         ${isTeacher ? `<button class="primary-button" id="new-post">${icon("plus", 18)} 發布新公告</button>` : `<div class="date-card"><span>${new Intl.DateTimeFormat("zh-TW", { weekday: "long" }).format(new Date())}</span><strong>${new Intl.DateTimeFormat("zh-TW", { month: "long", day: "numeric" }).format(new Date())}</strong></div>`}
       </section>
+      ${isAdmin ? `<section class="article-paper admin-service-status"><strong>系統狀態</strong><span id="admin-service-status" role="status">檢查中…</span><button class="secondary-button" id="refresh-admin-status">重新檢查</button></section>` : ""}
       <section class="toolbar" aria-label="公告篩選">
         <label class="search-box">${icon("search", 19)}<input id="search" value="${escapeHtml(state.search)}" placeholder="搜尋標題、內容或發布教師"></label>
         <div class="filter-tabs">
@@ -289,6 +291,8 @@ function renderDashboard() {
       </div>
     </main>`;
   bindHeader();
+  const refreshStatus=document.querySelector("#refresh-admin-status");
+  if(refreshStatus){const status=document.querySelector("#admin-service-status");const check=async()=>{refreshStatus.disabled=true;try{const result=await cloud.status();status.textContent=`API 與資料庫連線正常；目前共有 ${result.announcements} 則公告。`;}catch(error){status.textContent=error.message;}finally{refreshStatus.disabled=false;}};refreshStatus.addEventListener("click",check);check();}
   document.querySelector("#new-post")?.addEventListener("click", () => { state.editingId = "new"; render(); });
   document.querySelector("#search").addEventListener("input", (event) => {
     state.search = event.target.value;
@@ -453,6 +457,7 @@ async function refreshBanner() {
       document.querySelector(".login-marquee")?.remove();
       if(masthead && state.marquee.enabled && state.marquee.content){const ticker=document.createElement("div");ticker.className="login-marquee site-marquee";ticker.innerHTML=`<strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee>`;masthead.after(ticker);}
     }
+    if(state.session){const topbar=document.querySelector(".topbar");document.querySelector(".site-marquee:not(.login-marquee)")?.remove();if(topbar&&state.marquee.enabled&&state.marquee.content){const ticker=document.createElement("div");ticker.className="site-marquee";ticker.setAttribute("role","status");ticker.innerHTML=`<strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee>`;topbar.after(ticker);}}
   } catch {
     // Login remains usable if the public banner endpoint is temporarily unavailable.
   }
