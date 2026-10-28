@@ -52,7 +52,7 @@ node scripts/serve.mjs
 
 ## 問題與建議
 
-[Issues 選單](https://github.com/easonlin2013927/704-announcement-system/issues/new/choose) 提供問題回報、使用請教及網站建議。請勿提交密碼、學生個資或名冊。
+[Issues 表單](https://github.com/easonlin2013927/704-announcement-system/issues/new/choose) 提供問題回報、使用請教及網站建議。請勿提交密碼、學生個資或名冊。
 
 ## 活動倒數（v0.10.0）
 
