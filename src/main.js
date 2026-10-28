@@ -1,4 +1,4 @@
-import { cloud } from "./cloud.js";
+import { cloud } from "./cloud.js?v=0.3.1";
 import { portals, portalRole } from "./portal.js";
 
 let activeRole = portalRole(location.hash);
