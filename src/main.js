@@ -1,16 +1,15 @@
-import { cloud } from "./cloud.js?v=0.17.0";
+import { cloud } from "./cloud.js?v=0.17.1";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.17.0';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.17.1';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
 setupPwa(activeRole);
 let installPrompt=null;
-let installRequired=false;
-window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;installRequired=true;if(state.session&&state.session.role!=='admin')render();});
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;if(activeRole!=='admin')render();});
 window.addEventListener('appinstalled',()=>{installPrompt=null;render();});
-function renderInstallGuide(){app.innerHTML=`<main class="login-shell"><div class="login-center"><section class="login-panel"><div class="login-card"><h1>安裝 704班級系統</h1><p>請安裝${activeRole==='teacher'?'教師端':'學生端'}後，從主畫面開啟系統。若取消安裝，請重新整理以再次安裝。</p><button class="primary-button" id="install-pwa" ${installPrompt?'':'disabled'}>安裝應用程式</button><button class="secondary-button" id="install-logout">登出</button></div></section></div></main>`;document.querySelector('#install-pwa').onclick=async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;render();}};document.querySelector('#install-logout').onclick=()=>{cloud.logout();state.session=null;render();};}
+function renderInstallGuide(){const role=activeRole==='teacher'?'教師端':'學生端';document.title=`${role}安裝｜704班級系統`;app.innerHTML=`<main class="login-shell"><div class="login-center"><section class="login-panel"><div class="login-card"><img src="./src/logo.svg" width="72" height="72" alt="704班級系統"><h1>請使用 ${role} PWA</h1><p>若已安裝，請從裝置的主畫面或應用程式清單開啟「704${activeRole==='teacher'?'教師':'學生'}」。</p><p>若尚未安裝，請使用瀏覽器的安裝功能。iPhone／iPad 請在 Safari 按「分享」，再選「加入主畫面」。</p>${installPrompt?'<button class="primary-button" id="install-pwa">安裝應用程式</button>':''}</div></section></div></main>`;document.querySelector('#install-pwa')?.addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;render();}});}
 window.addEventListener("hashchange", () => {
   cloud.logout();
   state.session = null;
@@ -177,9 +176,9 @@ function toast(message, tone = "success") {
 function render() {
   disposeSchool();
   applyTheme(state.session?.theme || "dark");
+  if(activeRole!=='admin'&&!matchMedia('(display-mode: standalone)').matches&&!navigator.standalone)return renderInstallGuide();
   if (!state.session) return renderLogin();
   if (state.session.must_change_password) return renderPasswordChange();
-  if(state.session.role!=='admin'&&installRequired&&!matchMedia('(display-mode: standalone)').matches&&!navigator.standalone)return renderInstallGuide();
   if (state.settingsOpen) return renderSettings();
   if (state.adminView === "accounts" && ["admin","teacher"].includes(state.session.role)) return renderAccounts();
   if (state.schoolView !== 'home') return renderSchool();

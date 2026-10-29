@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.17.0 >/dev/null 2>&1; then
-            gh release create v0.17.0 --target "$GITHUB_SHA" --title "v0.17.0 班級系統與通知" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.17.1 >/dev/null 2>&1; then
+            gh release create v0.17.1 --target "$GITHUB_SHA" --title "v0.17.1 學生教師 PWA 入口提示" --notes-file deploy/RELEASE.md
           fi
