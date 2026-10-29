@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.17.2 >/dev/null 2>&1; then
-            gh release create v0.17.2 --target "$GITHUB_SHA" --title "v0.17.2 PWA 登入狀態修正" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.17.3 >/dev/null 2>&1; then
+            gh release create v0.17.3 --target "$GITHUB_SHA" --title "v0.17.3 Microsoft Edge 推播訂閱修正" --notes-file deploy/RELEASE.md
           fi
