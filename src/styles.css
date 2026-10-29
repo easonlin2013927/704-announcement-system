@@ -141,3 +141,5 @@ label { display: block; color: #344054; font-size: 14px; font-weight: 600; }.log
 .status-badge { display:inline-block; padding:5px 8px; border-radius:8px; background:#477d6a30; color:#9ddfc6; font-size:12px; }
 .status-badge.disabled { color:#ffb0c1; background:#bb385b25; }
 #password-logout { width:100%; margin-top:14px; }
+#operation-progress { position:fixed; z-index:2000; top:16px; left:50%; transform:translateX(-50%); padding:12px 20px; border-radius:12px; color:white; background:#41369a; box-shadow:0 6px 24px #0005; }
+#operation-progress[hidden] { display:none; }

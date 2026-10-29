@@ -1,7 +1,10 @@
-import { config } from "./config.js?v=0.16.2";
+import { config } from "./config.js?v=0.17.0";
 let token = null;
 async function request(path, options = {}) {
   if (!config.url) throw new Error("系統尚未設定雲端服務，請聯絡管理員。");
+  const mutation=!!options.method && options.method!=='GET';
+  if(mutation)window.dispatchEvent(new Event('operation-start'));
+  try {
   let response;
   try {
     response = await fetch(config.url.replace(/\/$/, "") + path, {
@@ -18,7 +21,9 @@ async function request(path, options = {}) {
     if(data.code==="PASSWORD_CHANGE_REQUIRED")window.dispatchEvent(new Event("password-required"));
     throw Object.assign(new Error(data.message || "雲端操作失敗，請稍後重試。"),{code:data.code});
   }
+  if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:true}}));
   return data;
+  } catch(error) {if(mutation)window.dispatchEvent(new CustomEvent('operation-result',{detail:{ok:false,message:error.message}}));throw error;} finally { if(mutation)window.dispatchEvent(new Event('operation-end')); }
 }
 export const cloud = {
   school(path,method='GET',value){return request('/school/'+path,{method,...(value===undefined?{}:{body:JSON.stringify(value)})});},

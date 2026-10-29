@@ -1,9 +1,16 @@
-import { cloud } from "./cloud.js?v=0.16.2";
+import { cloud } from "./cloud.js?v=0.17.0";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.16.2';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.17.0';
 
 let activeRole = portalRole(location.hash);
+function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
+setupPwa(activeRole);
+let installPrompt=null;
+let installRequired=false;
+window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;installRequired=true;if(state.session&&state.session.role!=='admin')render();});
+window.addEventListener('appinstalled',()=>{installPrompt=null;render();});
+function renderInstallGuide(){app.innerHTML=`<main class="login-shell"><div class="login-center"><section class="login-panel"><div class="login-card"><h1>安裝 704班級系統</h1><p>請安裝${activeRole==='teacher'?'教師端':'學生端'}後，從主畫面開啟系統。若取消安裝，請重新整理以再次安裝。</p><button class="primary-button" id="install-pwa" ${installPrompt?'':'disabled'}>安裝應用程式</button><button class="secondary-button" id="install-logout">登出</button></div></section></div></main>`;document.querySelector('#install-pwa').onclick=async()=>{if(installPrompt){await installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;render();}};document.querySelector('#install-logout').onclick=()=>{cloud.logout();state.session=null;render();};}
 window.addEventListener("hashchange", () => {
   cloud.logout();
   state.session = null;
@@ -12,6 +19,7 @@ window.addEventListener("hashchange", () => {
   state.selectedId = null;
   state.editingId = null;
   activeRole = portalRole(location.hash);
+  setupPwa(activeRole);
   render();
 });
 
@@ -42,6 +50,10 @@ const state = {
 };
 
 const app = document.querySelector("#app");
+let pendingOperations=0;
+window.addEventListener('operation-start',()=>{pendingOperations++;let el=document.querySelector('#operation-progress');if(!el){el=document.createElement('div');el.id='operation-progress';el.setAttribute('role','status');el.textContent='處理中，請稍候…';document.body.append(el);}el.hidden=false;});
+window.addEventListener('operation-end',()=>{pendingOperations=Math.max(0,pendingOperations-1);const el=document.querySelector('#operation-progress');if(el&&!pendingOperations)el.hidden=true;});
+window.addEventListener('operation-result',event=>toast(event.detail.ok?'操作成功':event.detail.message||'操作失敗',event.detail.ok?'success':'error'));
 document.addEventListener("click",event=>{const menu=document.querySelector(".create-menu");if(menu&&!menu.contains(event.target)){document.querySelector("#create-options").hidden=true;document.querySelector("#create-toggle").setAttribute("aria-expanded","false");}});
 
 function escapeHtml(value = "") {
@@ -167,6 +179,7 @@ function render() {
   applyTheme(state.session?.theme || "dark");
   if (!state.session) return renderLogin();
   if (state.session.must_change_password) return renderPasswordChange();
+  if(state.session.role!=='admin'&&installRequired&&!matchMedia('(display-mode: standalone)').matches&&!navigator.standalone)return renderInstallGuide();
   if (state.settingsOpen) return renderSettings();
   if (state.adminView === "accounts" && ["admin","teacher"].includes(state.session.role)) return renderAccounts();
   if (state.schoolView !== 'home') return renderSchool();
@@ -178,16 +191,16 @@ function render() {
 window.addEventListener("session-expired",()=>{state.session=null;state.settingsOpen=false;state.adminView="dashboard";render();});
 window.addEventListener("password-required",()=>{if(state.session){state.session.must_change_password=true;render();}});
 function renderPasswordChange(){
- app.innerHTML=`<main class="login-shell"><header class="login-masthead"><span class="portal-emblem">704</span><span>704公告系統</span></header><div class="login-center"><section class="login-panel"><div class="login-card"><h2>請更換密碼</h2><p class="muted">${escapeHtml(state.session.name)}，此帳號需要先更換密碼才能繼續使用。</p><form id="change-password-form"><label>目前密碼<input name="current_password" type="password" autocomplete="current-password"></label><label>新密碼<input name="new_password" type="password" autocomplete="new-password"></label><label>確認新密碼<input name="confirmation" type="password" autocomplete="new-password"></label><button class="primary-button wide">儲存新密碼</button></form><button class="secondary-button wide" id="password-logout">登出</button><p id="password-message" role="status"></p></div></section></div></main>`;
+ app.innerHTML=`<main class="login-shell"><header class="login-masthead"><span class="portal-emblem">704</span><span>704班級系統</span></header><div class="login-center"><section class="login-panel"><div class="login-card"><h2>請更換密碼</h2><p class="muted">${escapeHtml(state.session.name)}，此帳號需要先更換密碼才能繼續使用。</p><form id="change-password-form"><label>目前密碼<input name="current_password" type="password" autocomplete="current-password"></label><label>新密碼<input name="new_password" type="password" autocomplete="new-password"></label><label>確認新密碼<input name="confirmation" type="password" autocomplete="new-password"></label><button class="primary-button wide">儲存新密碼</button></form><button class="secondary-button wide" id="password-logout">登出</button><p id="password-message" role="status"></p></div></section></div></main>`;
  document.querySelector("#password-logout").addEventListener("click",()=>{cloud.logout();state.session=null;render();});
  document.querySelector("#change-password-form").addEventListener("submit",async event=>{event.preventDefault();const data=Object.fromEntries(new FormData(event.currentTarget)),button=event.currentTarget.querySelector("button"),message=document.querySelector("#password-message");if(data.new_password!==data.confirmation){message.textContent="兩次輸入的新密碼不相同";return;}button.disabled=true;try{const profile=await cloud.changePassword(data);state.session={...profile,name:profile.display_name};state.settingsOpen=false;state.adminView="dashboard";state.editingId=null;state.selectedId=null;state.announcements=[];state.countdowns=[];try{state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();}catch(error){toast(error.message,"error");}render();toast("密碼已更新");}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
 }
 function renderLogin() {
   const portal = portals[activeRole];
-  document.title = portal.title + "｜704公告系統";
+  document.title = portal.title + "｜704班級系統";
   app.innerHTML = `
     <main class="login-shell">
-      <header class="login-masthead"><span class="portal-emblem">704</span><span>704公告系統</span><a class="repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer">GitHub ↗</a><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
+      <header class="login-masthead"><span class="portal-emblem">704</span><span>704班級系統</span><a class="repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer">GitHub ↗</a><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
       ${state.marquee.enabled && state.marquee.content ? `<div class="login-marquee site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}
       <div class="login-center">
         <section class="login-slogan rich-content" aria-label="登入標語" ${state.banner.enabled && stripHtml(state.banner.content).trim() ? "" : "hidden"}>${sanitizeHtml(state.banner.content)}</section>
@@ -202,6 +215,7 @@ function renderLogin() {
             <button class="primary-button wide" type="submit">登入系統 ${icon("arrow", 18)}</button>
           </form>
           <p class="helper">${activeRole === "admin" ? "使用維護人員專用帳號登入。" : "使用教師或管理員提供的帳號登入。公告儲存於雲端。"}</p>
+          ${activeRole!=='admin'?'<p class="helper">請安裝此應用程式：iPad／iPhone 在 Safari 按分享，再選「加入主畫面」；其他裝置可使用瀏覽器的安裝選項。</p>':''}
         </div>
       </section>
       </div><footer class="login-footnote">704 ANNOUNCEMENT SYSTEM <span>讓每一則消息，清楚抵達。</span></footer>
@@ -230,7 +244,7 @@ function headerTemplate() {
   const isTeacher = ["teacher","assistant"].includes(state.session.role);
   return `
     <header class="topbar">
-      <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">${icon("bell", 26)}</span><span><strong>704公告系統</strong><small>班級公告</small></span></button>
+      <button class="wordmark" data-home aria-label="回到公告首頁"><img class="brand-mark small" src="./src/logo.svg" alt="" /><span><strong>704班級系統</strong><small>班級公告</small></span></button>
       <nav class="top-actions">
         <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
         <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
@@ -244,7 +258,7 @@ ${["admin","teacher"].includes(state.session.role) ? `<button class="secondary-b
 }
 
 function renderMaintenance() {
-  document.title = "系統維護｜704公告系統";
+  document.title = "系統維護｜704班級系統";
   app.innerHTML = `${headerTemplate()}<main class="page-shell">
     <section class="hero-row"><div><span class="eyebrow dark">MAINTENANCE CONSOLE</span>
     <h1>系統維護</h1><p>此入口用於查看服務狀態；公告內容由教師端管理。</p></div></section>
@@ -284,7 +298,7 @@ function renderAccounts() {
  <label class="check-option"><input name="disabled" type="checkbox">停用帳戶</label>
  <footer class="editor-footer"><span>編輯後，該帳號需重新登入。</span><button class="primary-button" id="save-person">建立帳號</button></footer>
  </form></dialog>
- <section class="editor-card"><h2>現有帳號</h2><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section></main>`;
+ <section class="editor-card"><h2>現有帳號</h2><label>篩選帳號<select id="account-filter"><option value="all">全部</option><option value="student">學生</option><option value="teacher">教師</option><option value="assistant">小老師</option><option value="admin">管理員</option><option value="disabled">已停用</option><option value="active">啟用中</option></select></label><p id="accounts-message" role="status">載入中…</p><div id="accounts-list"></div></section></main>`;
  bindHeader();
  document.querySelector("#accounts-back").addEventListener("click",goHome);
  const dialog=document.querySelector("#person-dialog"),form=document.querySelector("#account-form"),message=document.querySelector("#accounts-message"),list=document.querySelector("#accounts-list");
@@ -304,9 +318,10 @@ function renderAccounts() {
  const refresh=async()=>{
  try{
  state.accounts=await cloud.accounts();
- list.innerHTML=state.accounts.map(account=>`<div class="account-row"><div><strong>${escapeHtml(account.display_name)}</strong><small>${escapeHtml(account.email)}</small></div><div class="account-badges"><span class="role-chip">${portals[account.role].label}</span><span class="status-badge ${account.disabled?"disabled":""}">${account.disabled?"已停用":"啟用中"}</span>${account.must_change_password?'<span class="status-badge">需更換密碼</span>':""}</div><button class="secondary-button" data-edit-account="${account.id}">編輯</button>${isAdmin?`<button class="danger-button" data-remove-account="${account.id}">刪除</button>`:""}</div>`).join("")||"<p>尚無帳號。</p>";message.textContent="";
+ list.innerHTML=state.accounts.filter(account=>{const filter=document.querySelector("#account-filter").value;return filter==="all"||(filter==="active"?!account.disabled:filter==="disabled"?account.disabled:account.role===filter);}).map(account=>`<div class="account-row"><div><strong>${escapeHtml(account.display_name)}</strong><small>${escapeHtml(account.email)}</small></div><div class="account-badges"><span class="role-chip">${portals[account.role].label}</span><span class="status-badge ${account.disabled?"disabled":""}">${account.disabled?"已停用":"啟用中"}</span>${account.must_change_password?'<span class="status-badge">需更換密碼</span>':""}</div><button class="secondary-button" data-edit-account="${account.id}">編輯</button>${isAdmin?`<button class="danger-button" data-remove-account="${account.id}">刪除</button>`:""}</div>`).join("")||"<p>尚無帳號。</p>";message.textContent="";
  }catch(error){message.textContent=error.message;}
  };
+ document.querySelector("#account-filter").addEventListener("change",refresh);
  form.addEventListener("submit",async event=>{
  event.preventDefault();const button=document.querySelector("#save-person"),data=Object.fromEntries(new FormData(form)),id=data.id;delete data.id;
  data.disabled=form.elements.disabled.checked;data.must_change_password=form.elements.must_change_password.checked;
@@ -706,6 +721,10 @@ function renderPersonalization(){
  app.innerHTML=`${headerTemplate()}<main class="editor-shell settings-shell">${settingsTabs()}<div class="editor-heading"><span class="eyebrow dark">PERSONALIZATION</span><h1>個人化</h1><p>選擇系統風格、設定頭像與暱稱，儲存後會跟隨帳號保留。</p></div><form id="profile-form" class="editor-card"><h2>個人資料</h2><div class="profile-preview"><div id="profile-avatar">${avatarMarkup(state.session.name,avatar,"large")}</div><div><strong id="profile-name">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>原顯示名稱：${escapeHtml(state.session.name)}</small></div></div><label for="nickname">暱稱</label><input id="nickname" name="nickname" maxlength="80" value="${escapeHtml(state.session.nickname||"")}" placeholder="可留空，仍會保留原顯示名稱"><label class="editor-label" for="avatar-file">上傳頭像</label><div class="profile-upload"><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp"><button type="button" class="secondary-button" id="remove-avatar">移除頭像</button></div><p class="muted">PNG、JPEG、WebP，原圖最多 5 MB；系統會裁切成正方形並壓縮保存。</p><h2>系統風格</h2><div class="theme-grid" role="group" aria-label="選擇系統風格">${themes.map(option=>`<button type="button" class="theme-card" data-theme-choice="${option.id}" aria-pressed="${option.id===theme}" style="--preview-bg:${option.bg};--preview-surface:${option.surface};--preview-ink:${option.text};--preview-accent:${option.accent}"><div class="theme-preview"><div class="theme-preview-bar"></div><div class="theme-preview-panel">704 公告預覽</div></div><strong>${option.name}</strong><small>${option.description}</small></button>`).join("")}</div><p id="profile-message" role="status"></p><footer class="editor-footer"><span>風格可即時預覽，按儲存才會保存到帳號。</span><button class="primary-button" id="save-profile">儲存個人化設定</button></footer></form></main>`;
  bindHeader();bindSettingsTabs();
  const form=document.querySelector("#profile-form"),file=document.querySelector("#avatar-file"),message=document.querySelector("#profile-message"),save=document.querySelector("#save-profile");
+ form.insertAdjacentHTML('afterend',`<form id="notification-settings" class="editor-card"><h2>通知設定</h2><p>選擇要接收的通知類型。裝置通知需在安裝後開啟，並允許系統通知權限。</p><label class="check-option"><input type="checkbox" name="announcements">公告</label><label class="check-option"><input type="checkbox" name="homework">作業</label><label class="check-option"><input type="checkbox" name="points">加扣分</label><label class="check-option"><input type="checkbox" name="feedback">評語與提醒</label><button class="primary-button">儲存通知設定</button><button class="secondary-button" type="button" id="enable-push">啟用此裝置通知</button><button class="secondary-button" type="button" id="disable-push">停用此裝置通知</button><p role="status" id="notification-settings-message">載入中…</p></form>`);
+ const notificationsForm=document.querySelector('#notification-settings'),notificationsMessage=document.querySelector('#notification-settings-message');cloud.school('notification-settings').then(value=>{for(const key of ['announcements','homework','points','feedback'])notificationsForm.elements[key].checked=value[key];notificationsMessage.textContent='';}).catch(error=>{notificationsMessage.textContent=error.message;});notificationsForm.onsubmit=async event=>{event.preventDefault();try{const value={};for(const key of ['announcements','homework','points','feedback'])value[key]=notificationsForm.elements[key].checked;await cloud.school('notification-settings','PUT',value);notificationsMessage.textContent='通知設定已儲存';}catch(error){notificationsMessage.textContent=error.message;}};
+ document.querySelector('#enable-push').onclick=async()=>{try{if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))throw Error('此裝置不支援推播，請確認已安裝應用程式');const permission=await Notification.requestPermission();if(permission!=='granted')throw Error('尚未允許裝置通知');const registration=await navigator.serviceWorker.register('./service-worker.js');const key=await cloud.school('push-key');const b64=key.public_key.replace(/-/g,'+').replace(/_/g,'/');const bytes=Uint8Array.from(atob(b64+'='.repeat((4-b64.length%4)%4)),c=>c.charCodeAt(0));const subscription=await registration.pushManager.getSubscription()||await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:bytes});await cloud.school('push-subscription','POST',subscription.toJSON());notificationsMessage.textContent='此裝置通知已啟用';}catch(error){notificationsMessage.textContent=error.message;}};
+ document.querySelector('#disable-push').onclick=async()=>{try{const registration=await navigator.serviceWorker.getRegistration('./');const subscription=await registration?.pushManager.getSubscription();if(subscription){await cloud.school('push-subscription','DELETE',{endpoint:subscription.endpoint});await subscription.unsubscribe();}notificationsMessage.textContent='此裝置通知已停用';}catch(error){notificationsMessage.textContent=error.message;}};
  form.insertAdjacentHTML('afterend',`<form id="wallpaper-form" class="editor-card"><h2>儀表板桌布</h2><p>可上傳靜態圖片或動態 GIF，檔案大小最多 150 KB。</p><input id="wallpaper-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><div class="school-actions"><button class="primary-button" type="submit">儲存桌布</button><button class="secondary-button" type="button" id="wallpaper-remove">移除桌布</button></div><p id="wallpaper-message" role="status"></p></form>`);
  const wallpaperForm=document.querySelector('#wallpaper-form'),wallpaperFile=document.querySelector('#wallpaper-file'),wallpaperMessage=document.querySelector('#wallpaper-message');
  const saveWallpaper=async value=>{const result=await cloud.school('wallpaper','PUT',{wallpaper_url:value});state.session={...state.session,...result,name:result.display_name};wallpaperMessage.textContent='桌布已儲存';};
