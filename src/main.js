@@ -1,5 +1,5 @@
 import { cloud } from "./cloud.js?v=0.10.0";
-import { portals, portalRole } from "./portal.js";
+import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
 
 let activeRole = portalRole(location.hash);
@@ -208,7 +208,7 @@ function renderLogin() {
     button.disabled = true;
     try {
       const profile = await cloud.login(data.get("account"), data.get("password"), activeRole);
-      if (profile.role !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
+      if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
       state.session = { ...profile, name: profile.display_name };
       if(!profile.must_change_password){state.announcements = await cloud.list();state.countdowns = await cloud.countdowns();}
       state.selectedId = null;
@@ -220,7 +220,7 @@ function renderLogin() {
 }
 
 function headerTemplate() {
-  const isTeacher = state.session.role === "teacher";
+  const isTeacher = ["teacher","assistant"].includes(state.session.role);
   return `
     <header class="topbar">
       <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">${icon("bell", 26)}</span><span><strong>704公告系統</strong><small>班級公告</small></span></button>
@@ -229,7 +229,7 @@ function headerTemplate() {
         <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
         <span class="role-chip">${portals[state.session.role].label}端</span>
         <div class="user-block">${avatarMarkup(state.session.name,state.session.avatar_url)}<span><strong title="${escapeHtml(identityName(state.session.name,state.session.nickname))}">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
-${["admin","teacher"].includes(state.session.role) ? `<button class="secondary-button" id="open-accounts">${state.session.role==="teacher"?"學生帳號":"帳號管理"}</button>` : ""}
+${["admin","teacher"].includes(state.session.role) ? `<button class="secondary-button" id="open-accounts">${["teacher","assistant"].includes(state.session.role)?"學生帳號":"帳號管理"}</button>` : ""}
 <button class="secondary-button" id="open-settings">設定</button>
         <button class="icon-button" id="logout" title="登出">${icon("logout")}</button>
       </nav>
@@ -269,7 +269,7 @@ function renderAccounts() {
  <form class="editor-card" id="account-form"><h2 id="person-form-title">新增帳號</h2><input name="id" type="hidden"><div class="form-grid">
  <label>登入帳號<input name="email" required placeholder="請輸入登入帳號"></label>
  <label>顯示姓名<input name="name" placeholder="未填寫時使用登入帳號"></label>
- ${isAdmin?'<label>角色<select name="role"><option value="student">學生</option><option value="teacher">教師</option><option value="admin">管理員</option></select></label>':'<input type="hidden" name="role" value="student"><p>角色：學生</p>'}
+ ${isAdmin?'<label>角色<select name="role"><option value="student">學生</option><option value="teacher">教師</option><option value="assistant">小老師</option><option value="admin">管理員</option></select></label>':'<input type="hidden" name="role" value="student"><p>角色：學生</p>'}
  <label><span id="person-password-label">初始密碼</span><input name="password" type="password" autocomplete="new-password"></label>
  </div>
  <label class="check-option" id="reset-password-option" hidden><input name="reset_password" type="checkbox">重設密碼（未勾選時保留原密碼）</label>
@@ -353,7 +353,7 @@ function bindActivities(){
 }
 
 function renderDashboard() {
-  const isTeacher = ["teacher","admin"].includes(state.session.role);
+  const isTeacher = ["teacher","assistant","admin"].includes(state.session.role);
   const isAdmin = state.session.role === "admin";
   const results = filteredAnnouncements();
   app.innerHTML = `
@@ -423,7 +423,7 @@ function renderDetail() {
   const item = state.announcements.find((entry) => entry.id === state.selectedId);
   if (!item) { state.selectedId = null; return render(); }
   const category = categories[item.category];
-  const isTeacher = ["teacher","admin"].includes(state.session.role);
+  const isTeacher = ["teacher","assistant","admin"].includes(state.session.role);
   app.innerHTML = `${headerTemplate()}<main class="article-shell">
     <button class="back-button" id="back">${icon("back", 18)} 返回公告列表</button>
     <article class="article-paper">
@@ -671,9 +671,9 @@ function bindComments(item){
  form.addEventListener("submit",async event=>{event.preventDefault();const button=form.querySelector("button"),content=new FormData(form).get("content");button.disabled=true;try{await cloud.addComment(item.id,content);form.reset();await load();}catch(error){message.textContent=error.message;}finally{button.disabled=false;}});
  list.addEventListener("click",async event=>{const button=event.target.closest("[data-delete-comment]");if(!button)return;if(button.dataset.confirmed!=="yes"){button.dataset.confirmed="yes";button.textContent="確定刪除評論";return;}button.disabled=true;try{await cloud.deleteComment(item.id,button.dataset.deleteComment);await load();}catch(error){message.textContent=error.message;button.disabled=false;}});load();
 }
-function settingsTabs(){return `<nav class="settings-tabs" aria-label="設定分類"><button class="secondary-button" data-settings-tab="personal" aria-selected="${state.settingsTab!=="site"}">個人化</button>${state.session.role!=="student"?`<button class="secondary-button" data-settings-tab="site" aria-selected="${state.settingsTab==="site"}">網站設定</button>`:""}</nav>`;}
+function settingsTabs(){return `<nav class="settings-tabs" aria-label="設定分類"><button class="secondary-button" data-settings-tab="personal" aria-selected="${state.settingsTab!=="site"}">個人化</button>${["teacher","admin"].includes(state.session.role)?`<button class="secondary-button" data-settings-tab="site" aria-selected="${state.settingsTab==="site"}">網站設定</button>`:""}</nav>`;}
 function bindSettingsTabs(){document.querySelectorAll("[data-settings-tab]").forEach(button=>button.addEventListener("click",()=>{state.settingsTab=button.dataset.settingsTab;render();}));}
-function renderSettings(){if(state.settingsTab==="site"&&state.session.role!=="student")return renderSiteSettings();return renderPersonalization();}
+function renderSettings(){if(state.settingsTab==="site"&&["teacher","admin"].includes(state.session.role))return renderSiteSettings();return renderPersonalization();}
 function renderPersonalization(){
  let avatar=state.session.avatar_url||"",theme=state.session.theme||"dark";
  app.innerHTML=`${headerTemplate()}<main class="editor-shell settings-shell">${settingsTabs()}<div class="editor-heading"><span class="eyebrow dark">PERSONALIZATION</span><h1>個人化</h1><p>選擇系統風格、設定頭像與暱稱，儲存後會跟隨帳號保留。</p></div><form id="profile-form" class="editor-card"><h2>個人資料</h2><div class="profile-preview"><div id="profile-avatar">${avatarMarkup(state.session.name,avatar,"large")}</div><div><strong id="profile-name">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>原顯示名稱：${escapeHtml(state.session.name)}</small></div></div><label for="nickname">暱稱</label><input id="nickname" name="nickname" maxlength="80" value="${escapeHtml(state.session.nickname||"")}" placeholder="可留空，仍會保留原顯示名稱"><label class="editor-label" for="avatar-file">上傳頭像</label><div class="profile-upload"><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp"><button type="button" class="secondary-button" id="remove-avatar">移除頭像</button></div><p class="muted">PNG、JPEG、WebP，原圖最多 5 MB；系統會裁切成正方形並壓縮保存。</p><h2>系統風格</h2><div class="theme-grid" role="group" aria-label="選擇系統風格">${themes.map(option=>`<button type="button" class="theme-card" data-theme-choice="${option.id}" aria-pressed="${option.id===theme}" style="--preview-bg:${option.bg};--preview-surface:${option.surface};--preview-ink:${option.text};--preview-accent:${option.accent}"><div class="theme-preview"><div class="theme-preview-bar"></div><div class="theme-preview-panel">704 公告預覽</div></div><strong>${option.name}</strong><small>${option.description}</small></button>`).join("")}</div><p id="profile-message" role="status"></p><footer class="editor-footer"><span>風格可即時預覽，按儲存才會保存到帳號。</span><button class="primary-button" id="save-profile">儲存個人化設定</button></footer></form></main>`;

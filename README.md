@@ -1,5 +1,7 @@
 # 704公告系統
 
+v0.13.0 新增「小老師」獨立身分，與教師共用教師登入入口。小老師可發布、編輯及刪除公告和活動，管理自己發布公告的評論，並使用個人化設定；不能查看或管理帳號、修改網站標語、跑馬公告或系統管理設定。管理員可在帳號管理建立或編輯時選擇「小老師」。詳見[小老師手冊](docs/wiki/Assistant-Guide.md)。
+
 v0.12.0：頁首改用公告鈴鐺圖示。教師與管理員從「新增 → 公告」開啟部落格編輯工作室，可直接貼上截圖（Ctrl＋V）或選取圖片，網址會自動成為可點擊的超連結。圖片壓縮後隨公告保存於雲端。
 
 v0.12.0 起，學生、教師與維護人員頁首統一顯示「班級公告」。新增[個人化設定](docs/wiki/Personalization.md)：7 種風格、上傳頭像及暱稱，均保存到帳號。公告張貼者或管理員可在公告編輯頁切換評論區；讀者可以留言，顯示頭像與「原名稱（暱稱）」。上方 GitHub 按鈕可直接開啟本專案。
@@ -12,9 +14,10 @@ v0.12.0 起，學生、教師與維護人員頁首統一顯示「班級公告」
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.12.0#/student/login) | 閱讀、搜尋及分類公告 |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.12.0#/teacher/login) | 發布、編輯、刪除與置頂公告 |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.12.0#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
+| 小老師 | [教師／小老師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.13.0#/teacher/login) | 公告與活動管理，無帳號管理權限 |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.13.0#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.13.0#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.13.0#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
 
 三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
 

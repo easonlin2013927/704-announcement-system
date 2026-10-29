@@ -5,7 +5,7 @@ export async function migrate() {
  await db.query(`create table if not exists countdowns704 (id uuid primary key, title text not null, target_at timestamptz not null, created_at timestamptz not null default now());`);
  await db.query(`create table if not exists accounts704 (
  id uuid primary key, email text unique not null, display_name text not null,
- role text not null check(role in ('teacher','student','admin')), password_hash text not null);
+ role text not null check(role in ('teacher','assistant','student','admin')), password_hash text not null);
  create table if not exists announcements704 (
  id uuid primary key, title text not null, category text not null, author text not null,
  audience text not null, date timestamptz not null default now(), pinned boolean not null default false, content text not null);
@@ -36,6 +36,6 @@ export async function migrate() {
  // Atomic constraint migration preserves existing accounts and announcements.
  await db.query(`begin;
  alter table accounts704 drop constraint if exists accounts704_role_check;
- alter table accounts704 add constraint accounts704_role_check check (role in ('teacher','student','admin'));
+ alter table accounts704 add constraint accounts704_role_check check (role in ('teacher','assistant','student','admin'));
  commit;`);
 }

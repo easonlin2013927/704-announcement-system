@@ -60,7 +60,7 @@ const server = createServer(async (req,res) => {
  }
  attempts.delete(email);
  if(account.disabled) fail(403,"帳戶已停用，請聯絡教師或管理員");
- if (!["teacher","student","admin"].includes(data.portal) || data.portal !== account.role) fail(403,"帳號不屬於此登入入口");
+ if (!["teacher","student","admin"].includes(data.portal) || data.portal !== (account.role==="assistant"?"teacher":account.role)) fail(403,"帳號不屬於此登入入口");
  const token = randomBytes(32).toString("hex");
  await db.query("insert into sessions704 values($1,$2,now()+interval '8 hours')",[digest(token),account.id]);
  return send(200,{token,profile:profile(account)});
@@ -114,12 +114,12 @@ const server = createServer(async (req,res) => {
  }
  if (path === "/admin/accounts" && ["GET","POST"].includes(req.method)) {
  if(!["admin","teacher"].includes(user.role)) fail(403,"僅限教師或管理員管理帳號");
- if(req.method==="GET") return send(200,(await db.query(user.role==="teacher" ? "select id,email,display_name,role,disabled,must_change_password from accounts704 where role='student' order by display_name" : "select id,email,display_name,role,disabled,must_change_password from accounts704 order by role,display_name")).rows);
+ if(req.method==="GET") return send(200,(await db.query(["teacher","assistant"].includes(user.role) ? "select id,email,display_name,role,disabled,must_change_password from accounts704 where role='student' order by display_name" : "select id,email,display_name,role,disabled,must_change_password from accounts704 order by role,display_name")).rows);
  const value=await body(req);
  const email=typeof value.email==="string"?value.email.trim().toLowerCase():"";
  const name=typeof value.name==="string"&&value.name.trim()?value.name.trim():email;
- if(user.role==="teacher" && value.role!=="student") fail(403,"教師只能建立學生帳號");
- if(!email || !["student","teacher","admin"].includes(value.role) || typeof value.password!=="string" || (value.disabled!==undefined&&typeof value.disabled!=="boolean") || (value.must_change_password!==undefined&&typeof value.must_change_password!=="boolean")) fail(400,"帳號欄位格式錯誤");
+ if(["teacher","assistant"].includes(user.role) && value.role!=="student") fail(403,"教師只能建立學生帳號");
+ if(!email || !["student","teacher","assistant","admin"].includes(value.role) || typeof value.password!=="string" || (value.disabled!==undefined&&typeof value.disabled!=="boolean") || (value.must_change_password!==undefined&&typeof value.must_change_password!=="boolean")) fail(400,"帳號欄位格式錯誤");
  const result=await db.query("insert into accounts704(id,email,display_name,role,password_hash,disabled,must_change_password) values($1,$2,$3,$4,$5,$6,$7) on conflict(email) do nothing returning id,email,display_name,role,disabled,must_change_password",[randomUUID(),email,name,value.role,await hash(value.password),value.disabled??false,value.must_change_password??false]);
  if(!result.rowCount) fail(409,"此帳號已存在");
  return send(201,result.rows[0]);
@@ -134,7 +134,7 @@ const server = createServer(async (req,res) => {
  await client.query("lock table accounts704 in share row exclusive mode");
  const target=(await client.query("select * from accounts704 where id=$1",[accountMatch[1]])).rows[0];
  if(!target) fail(404,"找不到帳號");
- if(user.role==="teacher" && (target.role!=="student" || (value.role!==undefined&&value.role!=="student"))) fail(403,"教師只能編輯學生帳號");
+ if(["teacher","assistant"].includes(user.role) && (target.role!=="student" || (value.role!==undefined&&value.role!=="student"))) fail(403,"教師只能編輯學生帳號");
  if(req.method==="DELETE"){
  if(target.id===user.id) fail(400,"不能刪除目前登入的帳號");
  if(target.role==="admin"&&!target.disabled&&Number((await client.query("select count(*)::int as total from accounts704 where role='admin' and not disabled")).rows[0].total)<=1) fail(400,"至少需保留一位啟用中的管理員");
@@ -144,7 +144,7 @@ const server = createServer(async (req,res) => {
  const email=value.email===undefined?target.email:typeof value.email==="string"?value.email.trim().toLowerCase():"";
  const name=value.name===undefined?target.display_name:typeof value.name==="string"&&value.name.trim()?value.name.trim():email;
  const role=value.role??target.role,disabled=value.disabled??target.disabled,mustChange=value.must_change_password??target.must_change_password;
- if(!email || !["student","teacher","admin"].includes(role) || typeof disabled!=="boolean" || typeof mustChange!=="boolean" || (value.reset_password!==undefined&&typeof value.reset_password!=="boolean") || (value.reset_password&&typeof value.password!=="string")) fail(400,"帳號欄位格式錯誤");
+ if(!email || !["student","teacher","assistant","admin"].includes(role) || typeof disabled!=="boolean" || typeof mustChange!=="boolean" || (value.reset_password!==undefined&&typeof value.reset_password!=="boolean") || (value.reset_password&&typeof value.password!=="string")) fail(400,"帳號欄位格式錯誤");
  if(target.id===user.id && (disabled||role!=="admin"&&user.role==="admin")) fail(400,"不能停用自己或移除自己的管理員身分");
  if(target.role==="admin"&&!target.disabled&&(disabled||role!=="admin")&&Number((await client.query("select count(*)::int as total from accounts704 where role='admin' and not disabled")).rows[0].total)<=1) fail(400,"至少需保留一位啟用中的管理員");
  const result=await client.query("update accounts704 set email=$1,display_name=$2,role=$3,disabled=$4,must_change_password=$5,password_hash=$6 where id=$7 returning id,email,display_name,role,disabled,must_change_password",[email,name,role,disabled,mustChange,value.reset_password?await hash(value.password):target.password_hash,target.id]);
@@ -162,7 +162,7 @@ const server = createServer(async (req,res) => {
  if(path === "/countdowns" && req.method === "GET") return send(200,(await db.query("select * from countdowns704 order by target_at")).rows);
  const countdownMatch=path.match(/^\/countdowns\/([0-9a-f-]{36})$/i);
  if(path === "/countdowns" || countdownMatch){
- if(!["teacher","admin"].includes(user.role)) fail(403,"僅限教師或管理員管理倒數活動");
+ if(!["teacher","assistant","admin"].includes(user.role)) fail(403,"僅限教師或管理員管理倒數活動");
  if((path === "/countdowns" && req.method === "POST") || (countdownMatch && req.method === "PATCH")){
  const b=await body(req); const date=new Date(b.target_at);
  if(typeof b.title!=="string" || !b.title.trim() || b.title.length>80 || typeof b.target_at!=="string" || !Number.isFinite(date.getTime())) fail(400,"請輸入活動名稱與有效時間");
@@ -195,7 +195,7 @@ const server = createServer(async (req,res) => {
  const query="select n.*,coalesce(a.display_name,n.author) as author,a.nickname as author_nickname,a.avatar_url as author_avatar from announcements704 n left join accounts704 a on a.id=n.author_id";
  return send(200,(await db.query(query+(user.role==="student"?" where n.audience in ('學生','全部人員','全校學生','七年級','八年級','九年級')":"")+" order by n.pinned desc,n.date desc")).rows);
  }
- if(!["teacher","admin"].includes(user.role))fail(403,"僅限教師或管理員管理公告");
+ if(!["teacher","assistant","admin"].includes(user.role))fail(403,"僅限教師或管理員管理公告");
  const match=path.match(/^\/announcements\/([0-9a-f-]{36})$/i);
  if((path==="/announcements"&&req.method==="POST")||(match&&req.method==="PATCH")){
  const b=await body(req);
