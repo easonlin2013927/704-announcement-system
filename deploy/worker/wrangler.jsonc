@@ -1,0 +1,7 @@
+{
+  "name": "704-announcement-api",
+  "main": "proxy.mjs",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": { "enabled": false }
+}
