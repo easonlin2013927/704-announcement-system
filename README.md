@@ -2,7 +2,7 @@
 
 ## v0.14.1 新 API 入口與專案網址
 
-前端使用新版 [704 班級系統網址](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/student/login)，API 改用 Cloudflare Workers：`https://704-announcement-api.easonlin2013927.workers.dev`。原主機與 PostgreSQL 資料繼續使用，沒有搬移帳號資料。部署與容量限制見 [Worker 維護說明](deploy/worker/README.md)。
+前端使用新版 [704 班級系統網址](https://easonlin2013927.github.io/704-class-system/#/student/login)，API 改用 Cloudflare Workers：`https://704-announcement-api.easonlin2013927.workers.dev`。原主機與 PostgreSQL 資料繼續使用，沒有搬移帳號資料。部署與容量限制見 [Worker 維護說明](deploy/worker/README.md)。
 
 [新 API 健康檢查](https://704-announcement-api.easonlin2013927.workers.dev/health)正常應顯示 `{"status":"ok"}`。是否通過學校網域信譽過濾仍須在校網實測。
 
@@ -32,10 +32,10 @@ v0.12.0 起，學生、教師與維護人員頁首統一顯示「班級公告」
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 小老師 | [教師／小老師登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/teacher/login) | 公告與活動管理，無帳號管理權限 |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/student/login) | 閱讀、搜尋及分類公告 |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/teacher/login) | 發布、編輯、刪除與置頂公告 |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
+| 小老師 | [教師／小老師登入](https://easonlin2013927.github.io/704-class-system/#/teacher/login) | 公告與活動管理，無帳號管理權限 |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-class-system/#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-class-system/#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-class-system/#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
 
 三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
 
