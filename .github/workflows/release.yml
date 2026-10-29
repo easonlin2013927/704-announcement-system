@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.18.0 >/dev/null 2>&1; then
-            gh release create v0.18.0 --target "$GITHUB_SHA" --title "v0.18.0 收件閘及檢舉中心" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.18.1 >/dev/null 2>&1; then
+            gh release create v0.18.1 --target "$GITHUB_SHA" --title "v0.18.1 收件閘位置調整" --notes-file deploy/RELEASE.md
           fi
