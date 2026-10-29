@@ -1,11 +1,13 @@
-import { cloud } from "./cloud.js?v=0.10.0";
+import { cloud } from "./cloud.js?v=0.14.0";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.14.0';
 
 let activeRole = portalRole(location.hash);
 window.addEventListener("hashchange", () => {
   cloud.logout();
   state.session = null;
+  state.schoolView = 'home';
   state.settingsOpen = false;
   state.selectedId = null;
   state.editingId = null;
@@ -25,6 +27,8 @@ const state = {
   session: null,
   settingsOpen: false,
   settingsTab: "personal",
+  schoolView: 'home',
+  schoolCreate: null,
   banner: { enabled: false, content: "" },
   accounts: [],
   countdowns: [],
@@ -159,11 +163,13 @@ function toast(message, tone = "success") {
 }
 
 function render() {
+  disposeSchool();
   applyTheme(state.session?.theme || "dark");
   if (!state.session) return renderLogin();
   if (state.session.must_change_password) return renderPasswordChange();
   if (state.settingsOpen) return renderSettings();
   if (state.adminView === "accounts" && ["admin","teacher"].includes(state.session.role)) return renderAccounts();
+  if (state.schoolView !== 'home') return renderSchool();
   if (state.editingId !== null) return renderEditor();
   if (state.selectedId) return renderDetail();
   return renderDashboard();
@@ -210,6 +216,7 @@ function renderLogin() {
       const profile = await cloud.login(data.get("account"), data.get("password"), activeRole);
       if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
       state.session = { ...profile, name: profile.display_name };
+      state.schoolView = 'home';
       if(!profile.must_change_password){state.announcements = await cloud.list();state.countdowns = await cloud.countdowns();}
       state.selectedId = null;
       state.editingId = null;
@@ -233,7 +240,7 @@ ${["admin","teacher"].includes(state.session.role) ? `<button class="secondary-b
 <button class="secondary-button" id="open-settings">設定</button>
         <button class="icon-button" id="logout" title="登出">${icon("logout")}</button>
       </nav>
-    </header>${state.marquee.enabled && state.marquee.content ? `<div class="site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}`;
+    </header>${state.marquee.enabled && state.marquee.content ? `<div class="site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}${schoolNav(state.session,state.schoolView)}`;
 }
 
 function renderMaintenance() {
@@ -320,12 +327,15 @@ function renderAccounts() {
  });refresh();
 }
 
-function goHome(){state.selectedId=null;state.editingId=null;state.settingsOpen=false;state.adminView="dashboard";render();}
+function navigateSchool(view,create=null){state.schoolView=view;state.schoolCreate=create;state.selectedId=null;state.editingId=null;state.settingsOpen=false;state.adminView='dashboard';render();}
+function renderSchool(){app.innerHTML=`${headerTemplate()}<main class="page-shell school-shell"><div id="school-page"></div></main>`;bindHeader();mountSchool({node:document.querySelector('#school-page'),user:state.session,view:state.schoolView,create:state.schoolCreate,notify:toast,navigate:navigateSchool});state.schoolCreate=null;}
+function goHome(){navigateSchool('home');}
 function bindHeader() {
-  document.querySelector("#open-settings")?.addEventListener("click",()=>{state.settingsOpen=true;state.settingsTab="personal";state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();});
-  document.querySelector("#open-accounts")?.addEventListener("click",()=>{state.settingsOpen=false;state.adminView="accounts";state.editingId=null;state.selectedId=null;render();});
+  document.querySelectorAll('[data-school-view]').forEach(b=>b.addEventListener('click',()=>navigateSchool(b.dataset.schoolView)));
+  document.querySelector("#open-settings")?.addEventListener("click",()=>{state.schoolView='home';state.settingsOpen=true;state.settingsTab="personal";state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();});
+  document.querySelector("#open-accounts")?.addEventListener("click",()=>{state.schoolView='home';state.settingsOpen=false;state.adminView="accounts";state.editingId=null;state.selectedId=null;render();});
   document.querySelectorAll("[data-home]").forEach(button=>button.addEventListener("click",goHome));
-  document.querySelector("#logout")?.addEventListener("click",()=>{cloud.logout();state.session=null;state.settingsOpen=false;state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();refreshBanner();});
+  document.querySelector("#logout")?.addEventListener("click",()=>{cloud.logout();state.schoolView='home';state.session=null;state.settingsOpen=false;state.adminView="dashboard";state.selectedId=null;state.editingId=null;render();refreshBanner();});
 }
 
 function filteredAnnouncements() {
@@ -340,13 +350,13 @@ function updateCountdowns(){document.querySelectorAll("[data-countdown-at]").for
 setInterval(updateCountdowns,1000);
 
 function activityCards(isTeacher){return state.countdowns.map(item=>`<article class="editor-card countdown-card"><h3>${escapeHtml(item.title)}</h3><time>${formatDate(item.target_at,true)}</time><p class="countdown-value" data-countdown-at="${escapeHtml(item.target_at)}"></p>${isTeacher?`<button class="secondary-button" data-edit-countdown="${item.id}">編輯</button> <button class="danger-button" data-delete-countdown="${item.id}">刪除</button>`:""}</article>`).join("");}
-function activityDialog(isTeacher){return `${isTeacher?`<dialog id="activity-dialog" class="form-dialog"><button type="button" id="close-activity" class="back-button">關閉</button><form id="countdown-form" class="editor-card"><h3 id="countdown-form-title">新增倒數活動</h3><input type="hidden" name="id"><div class="form-grid"><label>活動名稱<input name="title" required maxlength="80"></label><label>活動時間（目前裝置時區）<input name="target_at" type="datetime-local" required></label></div><footer class="editor-footer"><button class="primary-button">儲存活動</button><button type="reset" class="secondary-button">取消編輯</button></footer></form></dialog>`:""}`;}
+function activityDialog(isTeacher){return `${isTeacher?`<dialog id="activity-dialog" class="form-dialog"><button type="button" id="close-activity" class="back-button">關閉</button><form id="countdown-form" class="editor-card"><h3 id="countdown-form-title">新增倒數活動</h3><input type="hidden" name="id"><div class="form-grid"><label>活動名稱<input name="title" required maxlength="80"></label><label>開始時間（目前裝置時區）<input name="target_at" type="datetime-local" required></label><label>結束時間（選填）<input name="ends_at" type="datetime-local"></label></div><footer class="editor-footer"><button class="primary-button">儲存活動</button><button type="reset" class="secondary-button">取消編輯</button></footer></form></dialog>`:""}`;}
 function bindActivities(){
  document.querySelector("#close-activity")?.addEventListener("click",()=>document.querySelector("#activity-dialog").close());
   updateCountdowns();
   const countdownForm=document.querySelector("#countdown-form");
-  countdownForm?.addEventListener("submit",async event=>{event.preventDefault();const data=new FormData(countdownForm);const button=countdownForm.querySelector(".primary-button");button.disabled=true;try{await cloud.saveCountdown({title:data.get("title"),target_at:new Date(data.get("target_at")).toISOString()},data.get("id"));state.countdowns=await cloud.countdowns();renderDashboard();toast("活動已儲存");}catch(error){toast(error.message,"error");}finally{button.disabled=false;}});
-  document.querySelectorAll("[data-edit-countdown]").forEach(button=>button.addEventListener("click",()=>{const item=state.countdowns.find(row=>row.id===button.dataset.editCountdown);const date=new Date(item.target_at);const local=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);countdownForm.elements.id.value=item.id;countdownForm.elements.title.value=item.title;countdownForm.elements.target_at.value=local;document.querySelector("#countdown-form-title").textContent="編輯倒數活動";document.querySelector("#activity-dialog").showModal();countdownForm.elements.title.focus();}));
+  countdownForm?.addEventListener("submit",async event=>{event.preventDefault();const data=new FormData(countdownForm);const button=countdownForm.querySelector(".primary-button");button.disabled=true;try{await cloud.saveCountdown({title:data.get("title"),target_at:new Date(data.get("target_at")).toISOString(),ends_at:data.get("ends_at")?new Date(data.get("ends_at")).toISOString():null},data.get("id"));state.countdowns=await cloud.countdowns();renderDashboard();toast("活動已儲存");}catch(error){toast(error.message,"error");}finally{button.disabled=false;}});
+  document.querySelectorAll("[data-edit-countdown]").forEach(button=>button.addEventListener("click",()=>{const item=state.countdowns.find(row=>row.id===button.dataset.editCountdown);const date=new Date(item.target_at);const local=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);countdownForm.elements.id.value=item.id;countdownForm.elements.title.value=item.title;countdownForm.elements.target_at.value=local;countdownForm.elements.ends_at.value=item.ends_at?new Date(new Date(item.ends_at).getTime()-new Date(item.ends_at).getTimezoneOffset()*60000).toISOString().slice(0,16):"";document.querySelector("#countdown-form-title").textContent="編輯倒數活動";document.querySelector("#activity-dialog").showModal();countdownForm.elements.title.focus();}));
   countdownForm?.addEventListener("reset",()=>{document.querySelector("#countdown-form-title").textContent="新增倒數活動";queueMicrotask(()=>{countdownForm.elements.id.value="";});});
   document.querySelectorAll("[data-delete-countdown]").forEach(button=>button.addEventListener("click",async()=>{if(!confirm("確定刪除此倒數活動？"))return;try{await cloud.deleteCountdown(button.dataset.deleteCountdown);state.countdowns=await cloud.countdowns();renderDashboard();}catch(error){toast(error.message,"error");}}));
 
@@ -361,8 +371,9 @@ function renderDashboard() {
     <main class="page-shell">
       <section class="hero-row">
         <div><span class="eyebrow dark">${isTeacher ? "TEACHER CONSOLE" : "STUDENT BULLETIN"}</span><h1>${isTeacher ? "公告管理" : "公告"}</h1><p>${isTeacher ? "清楚傳遞每一項校園資訊。" : "今天也別忘了看看校園裡的新消息。"}</p></div>
-        ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden><button id="new-post">公告</button><button id="new-activity">活動</button></div></div>` : ""}
+        ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden><button id="new-post">公告</button><button id="new-activity">活動</button><button data-school-create="homework">作業</button>${['teacher','admin'].includes(state.session.role)?'<button data-school-create="missing">缺交項目</button><button data-school-create="feedback">個別評語／提醒</button>':''}<button data-school-create="plan">個人行事曆事項</button></div></div>` : ""}
       </section>
+      <div id="student-home-overview"></div>
       <section class="toolbar" aria-label="公告篩選">
         <label class="search-box">${icon("search", 19)}<input id="search" value="${escapeHtml(state.search)}" placeholder="搜尋標題、內容或發布教師"></label>
         <div class="filter-tabs">
@@ -378,6 +389,8 @@ function renderDashboard() {
     </main>`;
   bindHeader();
   bindActivities();
+  loadStudentHome(document.querySelector('#student-home-overview'),state.session,navigateSchool);
+  document.querySelectorAll('[data-school-create]').forEach(b=>b.addEventListener('click',()=>{const type=b.dataset.schoolCreate;navigateSchool(type==='homework'?'homework':type==='plan'?'calendar':'records',type);}));
   const menu=document.querySelector(".create-menu"),toggle=document.querySelector("#create-toggle"),options=document.querySelector("#create-options");
   const showMenu=value=>{if(options){options.hidden=!value;toggle.setAttribute("aria-expanded",String(value));}};
   toggle?.addEventListener("click",()=>showMenu(true));

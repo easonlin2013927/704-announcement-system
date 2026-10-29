@@ -20,6 +20,7 @@ async function request(path, options = {}) {
   return data;
 }
 export const cloud = {
+  school(path,method='GET',value){return request('/school/'+path,{method,...(value===undefined?{}:{body:JSON.stringify(value)})});},
   async login(email, password, portal) {
     token = null;
     const result = await request("/login", { method: "POST", body: JSON.stringify({ email, password, portal }) });

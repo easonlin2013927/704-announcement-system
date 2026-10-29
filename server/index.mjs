@@ -3,6 +3,7 @@ import { hostname, platform, arch, cpus, totalmem, freemem, uptime } from "node:
 import { randomBytes, randomUUID } from "node:crypto";
 import { db, migrate } from "./db.mjs";
 import { verify, digest, hash } from "./password.mjs";
+import { migrateSchool, schoolRoutes } from "./school.mjs";
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
@@ -27,6 +28,7 @@ async function body(req) {
 }
 function fail(status, message, code) { throw Object.assign(new Error(message),{status,code}); }
 await migrate();
+await migrateSchool();
 const server = createServer(async (req,res) => {
  const send = (code,data) => { res.writeHead(code,{"Content-Type":"application/json; charset=utf-8"});res.end(JSON.stringify(data)); };
  res.setHeader("Cache-Control","no-store");
@@ -90,6 +92,7 @@ const server = createServer(async (req,res) => {
  }catch(error){await client.query("rollback");throw error;}finally{client.release();}
  }
  if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
+ if(path.startsWith('/school/'))return await schoolRoutes({path,method:req.method,user,readBody:()=>body(req),send});
  if(path==="/me"&&req.method==="GET")return send(200,profile((await db.query("select * from accounts704 where id=$1",[user.id])).rows[0]));
  if(path==="/me"&&req.method==="PATCH"){
  const value=await body(req);
@@ -165,8 +168,10 @@ const server = createServer(async (req,res) => {
  if(!["teacher","assistant","admin"].includes(user.role)) fail(403,"僅限教師或管理員管理倒數活動");
  if((path === "/countdowns" && req.method === "POST") || (countdownMatch && req.method === "PATCH")){
  const b=await body(req); const date=new Date(b.target_at);
+ const end=b.ends_at?new Date(b.ends_at):null;
+ if(end&&(!Number.isFinite(end.getTime())||end<date))fail(400,"結束時間不能早於開始時間");
  if(typeof b.title!=="string" || !b.title.trim() || b.title.length>80 || typeof b.target_at!=="string" || !Number.isFinite(date.getTime())) fail(400,"請輸入活動名稱與有效時間");
- const row=countdownMatch ? await db.query("update countdowns704 set title=$1,target_at=$2 where id=$3 returning *",[b.title.trim(),date.toISOString(),countdownMatch[1]]) : await db.query("insert into countdowns704(id,title,target_at) values($1,$2,$3) returning *",[randomUUID(),b.title.trim(),date.toISOString()]);
+ const row=countdownMatch ? await db.query("update countdowns704 set title=$1,target_at=$2,ends_at=$3 where id=$4 returning *",[b.title.trim(),date.toISOString(),end?.toISOString()||null,countdownMatch[1]]) : await db.query("insert into countdowns704(id,title,target_at,ends_at) values($1,$2,$3,$4) returning *",[randomUUID(),b.title.trim(),date.toISOString(),end?.toISOString()||null]);
  if(!row.rowCount) fail(404,"找不到活動"); return send(200,row.rows[0]);
  }
  if(countdownMatch && req.method==="DELETE"){await db.query("delete from countdowns704 where id=$1",[countdownMatch[1]]);return send(200,{ok:true});}
