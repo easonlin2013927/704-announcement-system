@@ -1,7 +1,7 @@
-import { cloud } from "./cloud.js?v=0.17.4";
+import { cloud } from "./cloud.js?v=0.18.0";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.17.4';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.18.0';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
@@ -244,7 +244,7 @@ function headerTemplate() {
   const isTeacher = ["teacher","assistant"].includes(state.session.role);
   return `
     <header class="topbar">
-      <button class="wordmark" data-home aria-label="回到公告首頁"><img class="brand-mark small" src="./src/logo.svg" alt="" /><span><strong>704班級系統</strong><small>班級公告</small></span></button>
+      <button class="wordmark" data-home aria-label="回到公告首頁"><img class="brand-mark small" src="./src/logo.svg" alt="" /><span><strong>704班級系統</strong><small>班級公告</small></span></button><button class="icon-button" data-school-view="notifications" aria-label="收件閘" title="收件閘"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></button>
       <nav class="top-actions">
         <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
         <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
