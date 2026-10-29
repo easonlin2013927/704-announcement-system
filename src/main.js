@@ -360,7 +360,7 @@ function renderDashboard() {
     ${headerTemplate()}
     <main class="page-shell">
       <section class="hero-row">
-        <div><span class="eyebrow dark">${isTeacher ? "TEACHER CONSOLE" : "STUDENT BULLETIN"}</span><h1>${isTeacher ? "公告管理" : "校園最新公告"}</h1><p>${isTeacher ? "清楚傳遞每一項校園資訊。" : "今天也別忘了看看校園裡的新消息。"}</p></div>
+        <div><span class="eyebrow dark">${isTeacher ? "TEACHER CONSOLE" : "STUDENT BULLETIN"}</span><h1>${isTeacher ? "公告管理" : "公告"}</h1><p>${isTeacher ? "清楚傳遞每一項校園資訊。" : "今天也別忘了看看校園裡的新消息。"}</p></div>
         ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden><button id="new-post">公告</button><button id="new-activity">活動</button></div></div>` : ""}
       </section>
       <section class="toolbar" aria-label="公告篩選">
