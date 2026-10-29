@@ -33,7 +33,7 @@ RLS 由資料庫強制執行。profiles 僅允許使用者讀取自己的角色�
 
 ## Wiki 發布
 
-docs/wiki 保留 Wiki 全部來源，README 直接連結這些可用文件。若 repository 已啟用原生 Wiki，先在 GitHub Wiki 建立第一頁，再將此資料夾的 Markdown 同步至獨立的 704-announcement-system.wiki.git repository。原生 Wiki 與主 repository 是兩個獨立 Git repository，主分支 commit 不會自動建立 Wiki 頁面。
+docs/wiki 保留 Wiki 全部來源，README 直接連結這些可用文件。若 repository 已啟用原生 Wiki，先在 GitHub Wiki 建立第一頁，再將此資料夾的 Markdown 同步至獨立的 704-class-system.wiki.git repository。原生 Wiki 與主 repository 是兩個獨立 Git repository，主分支 commit 不會自動建立 Wiki 頁面。
 
 ## 正式上線驗收
 

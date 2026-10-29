@@ -70,3 +70,8 @@ docker exec -i api704 node account.mjs < accounts.json
 備份 PostgreSQL 的 accounts704 與 announcements704 及表結構。sessions704 僅含登入狀態，可不復原。不要刪除資料庫或資料卷；沒有自動到期刪除公告的工作。不要把「永久保留」誤認為不需要備份。
 
 此部署尚未在使用者主機驗證；完成連線與角色驗收後再標正式 Release。
+
+
+## Cloudflare Workers 新入口
+
+前端目前透過 Workers 連接 API，原 Tunnel 與資料庫仍需維持運作。部署、配額及回復方式見 [Worker 維護說明](worker/README.md)。

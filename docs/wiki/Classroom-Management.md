@@ -1,6 +1,6 @@
 # 作業與個別學生紀錄（教師／管理員）
 
-[教師／小老師入口](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/teacher/login) · [管理員入口](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/admin/login)
+[教師／小老師入口](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/teacher/login) · [管理員入口](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/admin/login)
 
 ## 科目管理
 
@@ -46,13 +46,15 @@
 若 GitHub Pages 登入頁可開啟，但按登入後顯示「無法連接公告服務」，請由校方資訊人員檢查以下設定：
 
 - 前端：`easonlin2013927.github.io`，HTTPS TCP 443。
-- API：`api704.easonlin2013927.dpdns.org`，HTTPS TCP 443；登入、作業、聊天及行事曆都使用此主機。
+- API：`704-announcement-api.easonlin2013927.workers.dev`，HTTPS TCP 443；登入、作業、聊天及行事曆都使用此入口。原 `api704.easonlin2013927.dpdns.org` 仍作為 Worker 上游，請保留 Tunnel 路由。
 - API 使用 OPTIONS、GET、POST、PUT、PATCH、DELETE，需允許正常的 CORS 預檢及回應標頭。
 - 若學校有 HTTPS 檢查，確認 iPad 已依校方管理流程信任正確憑證鏈；或由資訊人員依學校政策設定該 API 的檢查例外。不要要求學生手動忽略安全警告或信任不明憑證。
-- 在 iPad Safari 直接開啟 `https://api704.easonlin2013927.dpdns.org/health`，正常只顯示 `{"status":"ok"}`。如果顯示學校防火牆頁面或憑證警告，先修正網路或信任設定，再測試登入。
+- 在 iPad Safari 直接開啟 `https://704-announcement-api.easonlin2013927.workers.dev/health`，正常只顯示 `{"status":"ok"}`。如果顯示學校防火牆頁面或憑證警告，先修正網路或信任設定，再測試登入。
 
 伺服器端以 iPad Safari User-Agent 測試登入預檢已取得 HTTP 204 及正確的 GitHub Pages 來源允許標頭。此結果不代表校內 iPad 的網路路徑也已通過；需要在實際裝置重新驗證。
 
 同一台 iPad 若在手機熱點正常顯示 `{"status":"ok"}`，但在校網出現防火牆或憑證警告，即可將問題縮小到校網路徑。暫時可使用手機熱點或家中網路；校內使用則需由校方允許 API 網域或修正 HTTPS 檢查設定。無法直接聯絡資訊人員時，可請任課老師協助轉達。修改登入表單、帳號密碼或略過憑證警告都無法正確解除校方網路限制。
+
+v0.14.1 已提供 Workers 替代網址，以測試原 `dpdns.org` 網域的信譽分類問題；它不保證一定能通過學校過濾。管理員可閱讀 [Worker 部署及配額說明](https://github.com/easonlin2013927/704-class-system/blob/main/deploy/worker/README.md)。
 
 新資料存放於 PostgreSQL 的 school_* 資料表，既有帳號與公告不會重建。請將這些表及原有表一起備份。系統不會自動清空作業、評語、聊天或事項；只有授權人員刪除、收回或刪除帳號時，相關紀錄才會依資料關聯移除。

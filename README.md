@@ -1,5 +1,11 @@
 # 704公告系統
 
+## v0.14.1 新 API 入口與專案網址
+
+前端使用新版 [704 班級系統網址](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/student/login)，API 改用 Cloudflare Workers：`https://704-announcement-api.easonlin2013927.workers.dev`。原主機與 PostgreSQL 資料繼續使用，沒有搬移帳號資料。部署與容量限制見 [Worker 維護說明](deploy/worker/README.md)。
+
+[新 API 健康檢查](https://704-announcement-api.easonlin2013927.workers.dev/health)正常應顯示 `{"status":"ok"}`。是否通過學校網域信譽過濾仍須在校網實測。
+
 ## v0.14.0 班級生活功能
 
 - **作業簿**：管理員建立科目；教師與小老師可分日期登錄多項功課、各設截止日，預設全班，也可指定學生。學生可勾選自己的完成紀錄。
@@ -10,7 +16,7 @@
 
 閱讀[學生操作手冊](docs/wiki/Student-Life.md)及[教師／管理員手冊](docs/wiki/Classroom-Management.md)。全部資料集中保存在 PostgreSQL，不使用瀏覽器本機儲存。聊天每 5 秒更新，歷史訊息可分頁載入；目前不提供附件、已讀回條及推播通知。
 
-GitHub Wiki：[學生班級生活手冊](https://github.com/easonlin2013927/704-announcement-system/wiki/StudentLife) · [教師與管理員班級管理手冊](https://github.com/easonlin2013927/704-announcement-system/wiki/Classroom)。
+GitHub Wiki：[學生班級生活手冊](https://github.com/easonlin2013927/704-class-system/wiki/StudentLife) · [教師與管理員班級管理手冊](https://github.com/easonlin2013927/704-class-system/wiki/Classroom)。
 
 v0.13.0 新增「小老師」獨立身分，與教師共用教師登入入口。小老師可發布、編輯及刪除公告和活動，管理自己發布公告的評論，並使用個人化設定；不能查看或管理帳號、修改網站標語、跑馬公告或系統管理設定。管理員可在帳號管理建立或編輯時選擇「小老師」。詳見[小老師手冊](docs/wiki/Assistant-Guide.md)。
 
@@ -26,10 +32,10 @@ v0.12.0 起，學生、教師與維護人員頁首統一顯示「班級公告」
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 小老師 | [教師／小老師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/teacher/login) | 公告與活動管理，無帳號管理權限 |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/student/login) | 閱讀、搜尋及分類公告 |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/teacher/login) | 發布、編輯、刪除與置頂公告 |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
+| 小老師 | [教師／小老師登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/teacher/login) | 公告與活動管理，無帳號管理權限 |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-class-system/?v=0.14.1#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
 
 三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
 
@@ -43,9 +49,9 @@ v0.12.0 起，學生、教師與維護人員頁首統一顯示「班級公告」
 - [教師使用手冊](docs/wiki/Teacher-Guide.md)
 - [維護人員使用說明](docs/wiki/Maintenance-Guide.md)
 - [1Panel 部署與帳號設定](deploy/README.md)
-- [既有 Wiki](https://github.com/easonlin2013927/704-announcement-system/wiki)
+- [既有 Wiki](https://github.com/easonlin2013927/704-class-system/wiki)
 
-三個登入網址亦列於 [Wiki 首頁](https://github.com/easonlin2013927/704-announcement-system/wiki)，各身分手冊提供自己的登入入口。
+三個登入網址亦列於 [Wiki 首頁](https://github.com/easonlin2013927/704-class-system/wiki)，各身分手冊提供自己的登入入口。
 
 ## 功能與資料保留
 
@@ -69,7 +75,7 @@ node scripts/serve.mjs
 
 ## 問題與建議
 
-[Issues 選單](https://github.com/easonlin2013927/704-announcement-system/issues/new/choose) 提供問題回報、使用請教及網站建議。請勿提交密碼、學生個資或名冊。
+[Issues 選單](https://github.com/easonlin2013927/704-class-system/issues/new/choose) 提供問題回報、使用請教及網站建議。請勿提交密碼、學生個資或名冊。
 
 ## 活動倒數（v0.10.0）
 

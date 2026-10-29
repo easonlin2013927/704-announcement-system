@@ -1,7 +1,7 @@
-import { cloud } from "./cloud.js?v=0.14.0-release";
+import { cloud } from "./cloud.js?v=0.14.1";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.14.0-release';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.14.1';
 
 let activeRole = portalRole(location.hash);
 window.addEventListener("hashchange", () => {
@@ -187,7 +187,7 @@ function renderLogin() {
   document.title = portal.title + "｜704公告系統";
   app.innerHTML = `
     <main class="login-shell">
-      <header class="login-masthead"><span class="portal-emblem">704</span><span>704公告系統</span><a class="repo-button" href="https://github.com/easonlin2013927/704-announcement-system" target="_blank" rel="noopener noreferrer">GitHub ↗</a><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
+      <header class="login-masthead"><span class="portal-emblem">704</span><span>704公告系統</span><a class="repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer">GitHub ↗</a><span class="portal-status"><i></i> CAMPUS CONNECTED</span></header>
       ${state.marquee.enabled && state.marquee.content ? `<div class="login-marquee site-marquee" role="status"><strong>最新消息</strong><marquee>${escapeHtml(state.marquee.content)}</marquee></div>` : ""}
       <div class="login-center">
         <section class="login-slogan rich-content" aria-label="登入標語" ${state.banner.enabled && stripHtml(state.banner.content).trim() ? "" : "hidden"}>${sanitizeHtml(state.banner.content)}</section>
@@ -232,7 +232,7 @@ function headerTemplate() {
     <header class="topbar">
       <button class="wordmark" data-home aria-label="回到公告首頁"><span class="brand-mark small">${icon("bell", 26)}</span><span><strong>704公告系統</strong><small>班級公告</small></span></button>
       <nav class="top-actions">
-        <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-announcement-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
+        <a class="secondary-button repo-button" href="https://github.com/easonlin2013927/704-class-system" target="_blank" rel="noopener noreferrer" aria-label="開啟 GitHub repo">GitHub ↗</a>
         <button class="icon-button" data-home title="首頁" aria-label="首頁">${icon("home")}</button>
         <span class="role-chip">${portals[state.session.role].label}端</span>
         <div class="user-block">${avatarMarkup(state.session.name,state.session.avatar_url)}<span><strong title="${escapeHtml(identityName(state.session.name,state.session.nickname))}">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>${state.session.role === "admin" ? "系統管理" : isTeacher ? "公告管理" : "704"}</small></span></div>
@@ -458,7 +458,7 @@ function renderEditor() {
   const canManageComments=!existing||state.session.role==="admin"||existing.author_id===state.session.id;
   app.innerHTML = `${headerTemplate()}<main class="editor-shell blog-studio">
     <button class="back-button" id="cancel-edit">${icon("back", 18)} 取消並返回</button>
-    <div class="editor-heading studio-heading"><div><span class="eyebrow dark">704 · PUBLISHING STUDIO · v0.14.0</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>寫下班級的新消息，讓重要的事被看見。</p></div><button type="button" class="secondary-button" id="focus-writing" aria-pressed="false">專注寫作</button></div>
+    <div class="editor-heading studio-heading"><div><span class="eyebrow dark">704 · PUBLISHING STUDIO · v0.14.1</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>寫下班級的新消息，讓重要的事被看見。</p></div><button type="button" class="secondary-button" id="focus-writing" aria-pressed="false">專注寫作</button></div>
     <form id="editor-form" class="editor-card studio-form">
       <div class="studio-workspace">
       <section class="studio-document" aria-label="文章編輯區">
