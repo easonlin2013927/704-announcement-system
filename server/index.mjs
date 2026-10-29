@@ -9,7 +9,7 @@ if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
 const categories = new Set(["important","academic","activity","general"]);
 const themes=new Set(["dark","light","ocean","forest","rose","amber","midnight"]);
-function profile(account){return {id:account.id,role:account.role,display_name:account.display_name,must_change_password:account.must_change_password,nickname:account.nickname,theme:account.theme,avatar_url:account.avatar_url};}
+function profile(account){return {id:account.id,role:account.role,display_name:account.display_name,must_change_password:account.must_change_password,nickname:account.nickname,theme:account.theme,avatar_url:account.avatar_url,wallpaper_url:account.wallpaper_url};}
 function validAvatar(value){
  if(value==="")return true;
  if(typeof value!=="string"||value.length>220000)return false;
@@ -91,9 +91,14 @@ const server = createServer(async (req,res) => {
  return send(200,{token:nextToken,profile:profile({...account,must_change_password:false})});
  }catch(error){await client.query("rollback");throw error;}finally{client.release();}
  }
- if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
- if(path.startsWith('/school/'))return await schoolRoutes({path,query:new URL(req.url,'http://localhost').searchParams,method:req.method,user,readBody:()=>body(req),send});
  if(path==="/me"&&req.method==="GET")return send(200,profile((await db.query("select * from accounts704 where id=$1",[user.id])).rows[0]));
+ if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
+ if(path==="/school/wallpaper"&&req.method==="PUT"){
+ const value=await body(req),image=value.wallpaper_url;
+ if(typeof image!=="string"||image.length>210000||!(image===''||/^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+={0,2}$/.test(image)))fail(400,"桌布格式錯誤或檔案過大");
+ return send(200,profile((await db.query("update accounts704 set wallpaper_url=$1 where id=$2 returning *",[image,user.id])).rows[0]));
+ }
+ if(path.startsWith('/school/'))return await schoolRoutes({path,query:new URL(req.url,'http://localhost').searchParams,method:req.method,user,readBody:()=>body(req),send});
  if(path==="/me"&&req.method==="PATCH"){
  const value=await body(req);
  if(typeof value.nickname!=="string"||value.nickname.length>80||!themes.has(value.theme)||!validAvatar(value.avatar_url))fail(400,"個人化資料格式錯誤；頭像請使用 PNG、JPEG 或 WebP，且壓縮後不超過 160 KB");

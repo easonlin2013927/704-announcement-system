@@ -21,6 +21,7 @@ export async function migrate() {
  await db.query(`alter table accounts704 add column if not exists nickname text not null default '';
  alter table accounts704 add column if not exists theme text not null default 'dark';
  alter table accounts704 add column if not exists avatar_url text not null default '';
+ alter table accounts704 add column if not exists wallpaper_url text not null default '';
  alter table announcements704 add column if not exists author_id uuid references accounts704(id) on delete set null;
  alter table announcements704 add column if not exists comments_enabled boolean not null default false;
  create table if not exists comments704 (id uuid primary key, announcement_id uuid not null references announcements704(id) on delete cascade,

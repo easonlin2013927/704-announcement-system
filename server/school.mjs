@@ -15,6 +15,7 @@ async function chatOpen(c=db){const row=(await c.query('select enabled from scho
 export async function migrateSchool(){await db.query(`
  alter table countdowns704 add column if not exists ends_at timestamptz;
  create table if not exists school_subjects(id uuid primary key,name text not null unique,active boolean not null default true);
+ create table if not exists school_grades(id uuid primary key,student_id uuid not null references accounts704(id) on delete cascade,author_id uuid references accounts704(id) on delete set null,subject_id uuid not null references school_subjects(id),title text not null,score numeric not null,grade_day date not null,created_at timestamptz not null default now());
  create table if not exists school_homework(id uuid primary key,subject_id uuid not null references school_subjects(id),author_id uuid references accounts704(id) on delete set null,title text not null,work_day date not null,due_on date not null,recipients uuid[],created_at timestamptz not null default now());
  create table if not exists school_checks(homework_id uuid references school_homework(id) on delete cascade,student_id uuid references accounts704(id) on delete cascade,done boolean not null default false,updated_at timestamptz not null default now(),primary key(homework_id,student_id));
  create table if not exists school_records(id uuid primary key,kind text not null check(kind in ('missing','feedback')),student_id uuid not null references accounts704(id) on delete cascade,author_id uuid references accounts704(id) on delete set null,subject_id uuid references school_subjects(id),title text not null,content text not null default '',record_day date not null,due_on date,resolved boolean not null default false,created_at timestamptz not null default now());
@@ -31,6 +32,17 @@ export async function migrateSchool(){await db.query(`
  `);}
 export async function schoolRoutes({path,query,method,user,readBody,send}){
  const tail=path.slice('/school/'.length).split('/');const [resource,id,action]=tail;
+ if(resource==='grades'){
+  requireRole(teacher(user)||user.role==='student');
+  if(method==='GET')return send(200,(await db.query(`select g.*,a.display_name as student,s.name as subject from school_grades g join accounts704 a on a.id=g.student_id join school_subjects s on s.id=g.subject_id ${user.role==='student'?'where g.student_id=$1':''} order by g.grade_day desc,g.created_at desc`,user.role==='student'?[user.id]:[])).rows);
+  if(method==='POST'){const b=await readBody(),student=user.role==='student'?user.id:b.student_id;if(!uuid(student)||!uuid(b.subject_id)||typeof b.score!=='number'||!Number.isFinite(b.score))fail(400,'成績資料格式錯誤');await students([student]);return send(201,(await db.query('insert into school_grades(id,student_id,author_id,subject_id,title,score,grade_day) values($1,$2,$3,$4,$5,$6,$7) returning *',[randomUUID(),student,user.id,b.subject_id,text(b.title,200),b.score,date(b.grade_day)])).rows[0]);}
+  if(method==='DELETE'&&uuid(id)){const r=await db.query(`delete from school_grades where id=$1 ${user.role==='student'?'and student_id=$2 and author_id=$2':''} returning id`,user.role==='student'?[id,user.id]:[id]);if(!r.rowCount)fail(404,'找不到可刪除的成績');return send(200,{ok:true});}
+ }
+ if(resource==='admin-rooms'&&method==='GET'){
+  requireRole(user.role==='admin');
+  if(!id)return send(200,(await db.query(`select r.*, (select coalesce(json_agg(a.display_name),'[]') from school_members m join accounts704 a on a.id=m.account_id where m.room_id=r.id) as members from school_rooms r order by r.created_at desc`)).rows);
+  if(uuid(id)&&action==='messages')return send(200,(await db.query('select id,author_name,content,deleted,created_at from school_messages where room_id=$1 order by created_at,id',[id])).rows);
+ }
  if(resource==='students'&&method==='GET'){requireRole(staff(user));return send(200,(await db.query("select id,display_name,nickname from accounts704 where role='student' and not disabled order by display_name")).rows);}
  if(resource==='subjects'){
   if(method==='GET')return send(200,(await db.query('select * from school_subjects order by name')).rows);

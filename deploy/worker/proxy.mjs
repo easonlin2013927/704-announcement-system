@@ -4,7 +4,7 @@ const MAX_BODY=262144;
 const METHODS=['GET','POST','PUT','PATCH','DELETE','OPTIONS'];
 const ID='[0-9a-fA-F-]{36}';
 const paths=new RegExp(`^(?:/(?:health|login|logout|me)|/account/password|/public/banner|/settings/(?:banner|marquee)|/admin/(?:accounts(?:/${ID})?|status)|/(?:announcements|countdowns)(?:/${ID}(?:/comments(?:/${ID})?)?)?|/school/[a-z-]+(?:/${ID}(?:/(?:check|messages|members|leave|report))?)?)$`);
-function responseHeaders(origin){const h=new Headers({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Vary':'Origin','Content-Type':'application/json; charset=utf-8'});if(origin===ORIGIN){h.set('Access-Control-Allow-Origin',ORIGIN);h.set('Access-Control-Allow-Methods',METHODS.join(', '));h.set('Access-Control-Allow-Headers','Content-Type, Authorization');h.set('Access-Control-Max-Age','600');}return h;}
+function responseHeaders(origin){const h=new Headers({'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Vary':'Origin','Content-Type':'application/json; charset=utf-8'});if(origin===ORIGIN){h.set('Access-Control-Allow-Origin',ORIGIN);h.set('Access-Control-Allow-Credentials','true');h.set('Access-Control-Allow-Methods',METHODS.join(', '));h.set('Access-Control-Allow-Headers','Content-Type, Authorization');h.set('Access-Control-Max-Age','600');}return h;}
 function error(status,message,headers){return new Response(JSON.stringify({message}),{status,headers});}
 async function readBody(request){
  if(Number(request.headers.get('content-length'))>MAX_BODY)throw Object.assign(new Error('內容過長'),{status:413});
@@ -22,6 +22,8 @@ export async function proxyRequest(request,{fetchUpstream=fetch}={}){
  if(request.method==='OPTIONS')return new Response(null,{status:204,headers});
  const upstreamHeaders=new Headers();
  for(const key of ['Authorization','Content-Type'])if(request.headers.has(key))upstreamHeaders.set(key,request.headers.get(key));
+ const cookie=request.headers.get('Cookie')||'';const session=cookie.match(/(?:^|;\s*)__Host-704session=([0-9a-f]{64})(?:;|$)/)?.[1];
+ if(!upstreamHeaders.has('Authorization')&&session)upstreamHeaders.set('Authorization','Bearer '+session);
  if(origin)upstreamHeaders.set('Origin',origin);
  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
  try{
@@ -30,6 +32,8 @@ export async function proxyRequest(request,{fetchUpstream=fetch}={}){
   const upstream=await fetchUpstream(target.href,{method:request.method,headers:upstreamHeaders,body,redirect:'manual',signal:controller.signal,cf:{cacheTtl:0,cacheEverything:false}});
   if(upstream.status>=300&&upstream.status<400)return error(502,'公告服務網址發生重新導向，請聯絡管理員',headers);
   if(!upstream.headers.get('content-type')?.includes('application/json'))return error(502,'公告主機暫時沒有提供正常回應，請稍後再試',headers);
+  if((url.pathname==='/login'||url.pathname==='/account/password')&&upstream.ok){const result=await upstream.json();if(/^[0-9a-f]{64}$/.test(result.token||''))headers.append('Set-Cookie',`__Host-704session=${result.token}; Path=/; Secure; HttpOnly; SameSite=None; Max-Age=28800`);return new Response(JSON.stringify(result),{status:upstream.status,headers});}
+  if(url.pathname==='/logout')headers.append('Set-Cookie','__Host-704session=; Path=/; Secure; HttpOnly; SameSite=None; Max-Age=0');
   return new Response(upstream.body,{status:upstream.status,headers});
  }catch(e){return error(e.status===413?413:502,e.status===413?'內容過長':'無法連接公告主機，請稍後再試',headers);}
  finally{clearTimeout(timeout);}

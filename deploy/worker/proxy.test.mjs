@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {proxyRequest} from './proxy.mjs';
 const origin='https://easonlin2013927.github.io',base='https://example.workers.dev';
 const json=(value,status=200)=>new Response(JSON.stringify(value),{status,headers:{'Content-Type':'application/json','Cache-Control':'public, max-age=3600','Set-Cookie':'never=forward'}});
-test('preflight is local, exact origin only, no credentials or public wildcard',async()=>{
+test('preflight is local and permits credentials only for the exact origin',async()=>{
  let hits=0;const request=new Request(base+'/login',{method:'OPTIONS',headers:{Origin:origin}});
  const r=await proxyRequest(request,{fetchUpstream:()=>{hits++;throw Error('unexpected');}});
- assert.equal(r.status,204);assert.equal(hits,0);assert.equal(r.headers.get('Access-Control-Allow-Origin'),origin);assert.equal(r.headers.get('Access-Control-Allow-Credentials'),null);
+ assert.equal(r.status,204);assert.equal(hits,0);assert.equal(r.headers.get('Access-Control-Allow-Origin'),origin);assert.equal(r.headers.get('Access-Control-Allow-Credentials'),'true');
  const denied=await proxyRequest(new Request(base+'/login',{method:'OPTIONS',headers:{Origin:'https://untrusted.example'}}));assert.equal(denied.status,403);
 });
 test('login forwards to fixed HTTPS destination and does not cache tokens/cookies',async()=>{
