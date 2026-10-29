@@ -27,11 +27,24 @@ export async function migrateSchool(){await db.query(`
  create table if not exists school_messages(id uuid primary key,room_id uuid not null references school_rooms(id) on delete cascade,author_id uuid references accounts704(id) on delete set null,author_name text not null,content text not null,deleted boolean not null default false,created_at timestamptz not null default now());
  create index if not exists school_message_room on school_messages(room_id,created_at);
  create table if not exists school_reports(id uuid primary key,message_id uuid not null references school_messages(id) on delete cascade,reporter_id uuid references accounts704(id) on delete set null,reason text not null,resolved boolean not null default false,created_at timestamptz not null default now());
+ alter table school_reports add column if not exists report_type text not null default 'message';
+ alter table school_reports add column if not exists target_id uuid references accounts704(id) on delete set null;
+ alter table accounts704 add column if not exists chat_muted boolean not null default false;
+ create table if not exists school_points(id uuid primary key,student_id uuid not null references accounts704(id) on delete cascade,author_id uuid references accounts704(id) on delete set null,amount integer not null,reason text not null,created_at timestamptz not null default now());
  create index if not exists school_records_student on school_records(student_id,record_day);
  create index if not exists school_plans_owner on school_plans(owner_id,start_at);
  `);}
 export async function schoolRoutes({path,query,method,user,readBody,send}){
  const tail=path.slice('/school/'.length).split('/');const [resource,id,action]=tail;
+ if(resource==='points'){
+  if(method==='GET')return send(200,(await db.query("select a.id,a.display_name,a.nickname,coalesce(sum(p.amount),0)::integer as points from accounts704 a left join school_points p on p.student_id=a.id where a.role='student' and not a.disabled group by a.id order by points desc,a.display_name")).rows);
+  requireRole(teacher(user));if(method==='POST'){const b=await readBody();if(!uuid(b.student_id)||!Number.isInteger(b.amount)||b.amount===0||Math.abs(b.amount)>10000)fail(400,'請選擇學生並輸入非零整數分數');await students([b.student_id]);return send(201,(await db.query('insert into school_points(id,student_id,author_id,amount,reason) values($1,$2,$3,$4,$5) returning *',[randomUUID(),b.student_id,user.id,b.amount,text(b.reason,500)])).rows[0]);}
+ }
+ if(resource==='chat-stats'){
+  requireRole(user.role==='admin');
+  if(method==='GET')return send(200,(await db.query("select a.id,a.display_name,a.nickname,a.chat_muted,count(m.id)::integer as count from accounts704 a left join school_messages m on m.author_id=a.id and m.created_at >= date_trunc('month',now() at time zone 'Asia/Taipei') at time zone 'Asia/Taipei' where a.role='student' and not a.disabled group by a.id order by count desc,a.display_name")).rows);
+  if(method==='PATCH'&&uuid(id)){const b=await readBody();if(typeof b.muted!=='boolean')fail(400,'設定格式錯誤');const r=await db.query("update accounts704 set chat_muted=$1 where id=$2 and role='student' returning id,chat_muted",[b.muted,id]);if(!r.rowCount)fail(404,'找不到學生');return send(200,r.rows[0]);}
+ }
  if(resource==='grades'){
   requireRole(teacher(user)||user.role==='student');
   if(method==='GET')return send(200,(await db.query(`select g.*,a.display_name as student,s.name as subject from school_grades g join accounts704 a on a.id=g.student_id join school_subjects s on s.id=g.subject_id ${user.role==='student'?'where g.student_id=$1':''} order by g.grade_day desc,g.created_at desc`,user.role==='student'?[user.id]:[])).rows);
@@ -89,18 +102,18 @@ export async function schoolRoutes({path,query,method,user,readBody,send}){
   if(uuid(id)&&action==='messages'){
    await membership(id,user);
    if(method==='GET'){const before=query?.get('before')||null;if(before&&!uuid(before))fail(400,'訊息游標錯誤');return send(200,(await db.query(`select m.id,m.author_id,m.author_name,case when m.deleted then '此訊息已移除' else m.content end as content,m.deleted,m.created_at,a.nickname from school_messages m left join accounts704 a on a.id=m.author_id where room_id=$1 and ($2::uuid is null or (m.created_at,m.id)<(select created_at,id from school_messages where id=$2 and room_id=$1)) order by m.created_at desc,m.id desc limit 200`,[id,before])).rows.reverse());}
-   if(method==='POST'){const b=await readBody();return send(201,await transaction(async c=>{await chatOpen(c);await membership(id,user,c);return (await c.query('insert into school_messages(id,room_id,author_id,author_name,content) values($1,$2,$3,$4,$5) returning id',[randomUUID(),id,user.id,user.display_name,text(b.content,5000)])).rows[0];}));}
+   if(method==='POST'){const b=await readBody();return send(201,await transaction(async c=>{await chatOpen(c);await membership(id,user,c);if((await c.query('select chat_muted from accounts704 where id=$1',[user.id])).rows[0].chat_muted)fail(403,'你目前無法傳送訊息，請聯絡管理員');return (await c.query('insert into school_messages(id,room_id,author_id,author_name,content) values($1,$2,$3,$4,$5) returning id',[randomUUID(),id,user.id,user.display_name,text(b.content,5000)])).rows[0];}));}
   }
  }
  if(resource==='messages'&&uuid(id)){
   const msg=(await db.query('select * from school_messages where id=$1',[id])).rows[0];if(!msg)fail(404,'找不到訊息');await membership(msg.room_id,user);
   if(method==='DELETE'){requireRole(msg.author_id===user.id);await db.query("update school_messages set deleted=true,content='' where id=$1",[id]);return send(200,{ok:true});}
-  if(action==='report'&&method==='POST'){const b=await readBody();if(msg.deleted)fail(400,'訊息已移除');return send(201,(await db.query('insert into school_reports(id,message_id,reporter_id,reason) values($1,$2,$3,$4) returning id',[randomUUID(),id,user.id,text(b.reason,1000)])).rows[0]);}
+  if(action==='report'&&method==='POST'){const b=await readBody(),type=b.type||'message';if(!['message','avatar','nickname'].includes(type))fail(400,'檢舉類型錯誤');if(msg.deleted||!msg.author_id)fail(400,'此項目已無法檢舉');return send(201,(await db.query('insert into school_reports(id,message_id,reporter_id,reason,report_type,target_id) values($1,$2,$3,$4,$5,$6) returning id',[randomUUID(),id,user.id,text(b.reason,1000),type,msg.author_id])).rows[0]);}
  }
  if(resource==='reports'){
-  requireRole(user.role==='admin');
-  if(method==='GET')return send(200,(await db.query('select r.*,m.content,m.author_name,m.deleted from school_reports r join school_messages m on m.id=r.message_id order by r.created_at desc')).rows);
-  if(method==='PATCH'&&uuid(id)){const b=await readBody();if(typeof b.remove_message!=='boolean')fail(400,'處理格式錯誤');return send(200,await transaction(async c=>{const report=(await c.query('update school_reports set resolved=true where id=$1 returning *',[id])).rows[0];if(!report)fail(404,'找不到檢舉');if(b.remove_message)await c.query("update school_messages set deleted=true,content='' where id=$1",[report.message_id]);return {ok:true};}));}
+  requireRole(teacher(user));
+  if(method==='GET')return send(200,(await db.query('select r.*,m.content,m.author_name,m.deleted,a.nickname,a.avatar_url from school_reports r join school_messages m on m.id=r.message_id left join accounts704 a on a.id=r.target_id order by r.created_at desc')).rows);
+  if(method==='PATCH'&&uuid(id)){const b=await readBody();if(typeof b.remove_message!=='boolean')fail(400,'處理格式錯誤');return send(200,await transaction(async c=>{const report=(await c.query('update school_reports set resolved=true where id=$1 returning *',[id])).rows[0];if(!report)fail(404,'找不到檢舉');if(b.remove_message){if(report.report_type==='message')await c.query("update school_messages set deleted=true,content='' where id=$1",[report.message_id]);else if(report.report_type==='nickname')await c.query("update accounts704 set nickname='' where id=$1",[report.target_id]);else if(report.report_type==='avatar')await c.query("update accounts704 set avatar_url='' where id=$1",[report.target_id]);}return {ok:true};}));}
  }
  fail(404,'找不到此功能');
 }
