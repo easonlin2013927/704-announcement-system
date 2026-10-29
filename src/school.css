@@ -34,3 +34,7 @@
 .create-menu{position:relative;z-index:5;flex:0 0 auto;}.create-options{background:var(--surface)!important;border-color:var(--line);max-height:65vh;overflow:auto;}.create-options button{color:var(--ink);}.hero-row{position:relative;}
 @media(max-width:750px){.school-heading{align-items:flex-start;flex-direction:column;}.homework-row{align-items:flex-start;flex-direction:column;}.homework-row .school-actions{margin-bottom:0;}.calendar-day{min-height:85px;padding:5px;}.calendar-event{font-size:10px;padding:2px;}.calendar-controls h2{font-size:18px;}.chat-layout{grid-template-columns:1fr;height:auto;max-height:none;}.room-list{border-right:0;border-bottom:1px solid var(--line);max-height:180px;}.chat-main{height:520px;}.agenda-row{align-items:flex-start;flex-wrap:wrap;}.school-nav{padding:12px 14px;}.student-picker{grid-template-columns:1fr 1fr;}}
 @media(max-width:450px){.calendar-day{min-height:75px;}.calendar-event{font-size:9px;}.calendar-day small{font-size:9px;}.school-filters>*{flex:1;}.calendar-controls{gap:8px;}.calendar-controls button{padding:9px;}.student-picker{grid-template-columns:1fr;}}
+.report-menu { position: relative; display: inline-block; }
+.report-menu summary { cursor: pointer; padding: 8px; }
+.report-menu > div { display: none; position: absolute; z-index: 4; min-width: 150px; padding: 8px; border-radius: 10px; background: var(--surface, #202438); box-shadow: 0 5px 20px #0006; }
+.report-menu[open] > div, .report-menu:hover > div, .report-menu:focus-within > div { display: grid; gap: 4px; }
