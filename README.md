@@ -2,7 +2,7 @@
 
 ## v0.15.0 班級功能與固定入口
 
-前端使用固定 [704 班級系統網址](https://easonlin2013927.github.io/704-class-system/#/student/login)，API 改用 Cloudflare Workers：`https://704-announcement-api.easonlin2013927.workers.dev`。原主機與 PostgreSQL 資料繼續使用，沒有搬移帳號資料。部署與容量限制見 [Worker 維護說明](deploy/worker/README.md)。
+前端使用固定 [704 班級系統網址](https://easonlin2013927.github.io/704-class-system/?app=student#/student/login)，API 改用 Cloudflare Workers：`https://704-announcement-api.easonlin2013927.workers.dev`。原主機與 PostgreSQL 資料繼續使用，沒有搬移帳號資料。部署與容量限制見 [Worker 維護說明](deploy/worker/README.md)。
 
 [新 API 健康檢查](https://704-announcement-api.easonlin2013927.workers.dev/health)正常應顯示 `{"status":"ok"}`。是否通過學校網域信譽過濾仍須在校網實測。
 
@@ -30,11 +30,13 @@ v0.12.0 起，學生、教師與維護人員頁首統一顯示「班級公告」
 
 ## 各系統登入網址
 
+學生、教師與小老師請使用各自的安裝入口。登入後，支援自動安裝提示的瀏覽器會要求安裝；iPad／iPhone 請用 Safari「分享 → 加入主畫面」。管理員不受安裝限制。
+
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 小老師 | [教師／小老師登入](https://easonlin2013927.github.io/704-class-system/#/teacher/login) | 公告與活動管理，無帳號管理權限 |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-class-system/#/student/login) | 閱讀、搜尋及分類公告 |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-class-system/#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 小老師 | [教師／小老師登入](https://easonlin2013927.github.io/704-class-system/?app=teacher#/teacher/login) | 公告與活動管理，無帳號管理權限 |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-class-system/?app=student#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-class-system/?app=teacher#/teacher/login) | 發布、編輯、刪除與置頂公告 |
 | 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-class-system/#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
 
 三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
@@ -57,7 +59,7 @@ v0.12.0 起，學生、教師與維護人員頁首統一顯示「班級公告」
 
 支援粗體、斜體、底線、螢光筆、標題、引用、清單與連結。公告集中存於 PostgreSQL，沒有到期自動刪除；清除瀏覽器資料與重新部署前端不會刪除公告。教師可共同管理公告。
 
-前端不使用 localStorage、sessionStorage 或 IndexedDB 儲存公告或登入憑證，登入憑證使用安全 Cookie 維持登入，瀏覽器阻擋跨網站 Cookie 時可能需要重新登入。沒有草稿、回收桶、附件與即時通知。資料庫仍需由維護人員定期備份。
+前端不使用 localStorage、sessionStorage 或 IndexedDB 儲存公告或登入憑證，登入憑證使用安全 Cookie 維持登入，瀏覽器阻擋跨網站 Cookie 時可能需要重新登入。目前支援公告附件及通知。資料庫仍需由維護人員定期備份。
 
 ## 開發與部署
 
