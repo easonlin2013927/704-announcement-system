@@ -32,11 +32,50 @@ export async function migrateSchool(){await db.query(`
  alter table accounts704 add column if not exists chat_muted boolean not null default false;
  create table if not exists school_points(id uuid primary key,student_id uuid not null references accounts704(id) on delete cascade,author_id uuid references accounts704(id) on delete set null,amount integer not null,reason text not null,created_at timestamptz not null default now());
  create table if not exists school_attachments(id uuid primary key,announcement_id uuid not null references announcements704(id) on delete cascade,name text not null,owner_id uuid references accounts704(id) on delete set null,bytes bytea not null default ''::bytea,complete boolean not null default false,created_at timestamptz not null default now());
+ create table if not exists school_notifications(id bigint generated always as identity primary key,account_id uuid not null references accounts704(id) on delete cascade,kind text not null,title text not null,created_at timestamptz not null default now(),read_at timestamptz);
+ create table if not exists school_notification_settings(account_id uuid primary key references accounts704(id) on delete cascade,announcements boolean not null default true,homework boolean not null default true,points boolean not null default true,feedback boolean not null default true);
+ create table if not exists school_push_keys(id integer primary key check(id=1),public_key text not null,private_key text not null);
+ create table if not exists school_push_subscriptions(endpoint text primary key,account_id uuid not null references accounts704(id) on delete cascade,subscription jsonb not null,created_at timestamptz not null default now());
+ create table if not exists school_push_delivery(notification_id bigint references school_notifications(id) on delete cascade,endpoint text references school_push_subscriptions(endpoint) on delete cascade,delivered_at timestamptz not null default now(),primary key(notification_id,endpoint));
+ create index if not exists school_notifications_account on school_notifications(account_id,created_at desc);
+ create or replace function school_notify_event() returns trigger language plpgsql as $$
+ begin
+  if tg_table_name='announcements704' then
+   insert into school_notifications(account_id,kind,title) select a.id,'announcements',new.title from accounts704 a left join school_notification_settings s on s.account_id=a.id where not a.disabled and a.id is distinct from new.author_id and coalesce(s.announcements,true) and (new.audience='全部人員' or (new.audience='學生' and a.role='student') or (new.audience='教師' and a.role in ('teacher','assistant','admin')));
+  elsif tg_table_name='school_homework' then
+   insert into school_notifications(account_id,kind,title) select a.id,'homework',new.title from accounts704 a left join school_notification_settings s on s.account_id=a.id where a.role='student' and not a.disabled and coalesce(s.homework,true) and (new.recipients is null or a.id=any(new.recipients));
+  elsif tg_table_name='school_points' then
+   insert into school_notifications(account_id,kind,title) select new.student_id,'points',case when new.amount>0 then '獲得加分：' else '收到扣分：' end || new.amount::text where coalesce((select points from school_notification_settings where account_id=new.student_id),true);
+  elsif tg_table_name='school_records' then
+   insert into school_notifications(account_id,kind,title) select new.student_id,'feedback',new.title where coalesce((select feedback from school_notification_settings where account_id=new.student_id),true);
+  end if;return new;
+ end $$;
+ drop trigger if exists school_notify_announcement on announcements704;
+ create trigger school_notify_announcement after insert on announcements704 for each row execute function school_notify_event();
+ drop trigger if exists school_notify_homework on school_homework;
+ create trigger school_notify_homework after insert on school_homework for each row execute function school_notify_event();
+ drop trigger if exists school_notify_points on school_points;
+ create trigger school_notify_points after insert on school_points for each row execute function school_notify_event();
+ drop trigger if exists school_notify_records on school_records;
+ create trigger school_notify_records after insert on school_records for each row execute function school_notify_event();
  create index if not exists school_records_student on school_records(student_id,record_day);
  create index if not exists school_plans_owner on school_plans(owner_id,start_at);
  `);}
 export async function schoolRoutes({path,query,method,user,readBody,send}){
  const tail=path.slice('/school/'.length).split('/');const [resource,id,action]=tail;
+ if(resource==='push-key'&&method==='GET'){const key=(await db.query('select public_key from school_push_keys where id=1')).rows[0];if(!key)fail(503,'推播服務尚未啟用');return send(200,key);}
+ if(resource==='push-subscription'){
+  if(method==='POST'){const b=await readBody();let endpoint;try{endpoint=new URL(b.endpoint);}catch{fail(400,'推播訂閱格式錯誤');}const host=endpoint.hostname;if(endpoint.protocol!=='https:'||endpoint.port||endpoint.username||endpoint.password||!(host==='fcm.googleapis.com'||host==='updates.push.services.mozilla.com'||host.endsWith('.push.apple.com'))||b.endpoint.length>2000||typeof b.keys?.p256dh!=='string'||typeof b.keys?.auth!=='string')fail(400,'推播訂閱格式錯誤');await db.query('insert into school_push_subscriptions(endpoint,account_id,subscription) values($1,$2,$3) on conflict(endpoint) do update set account_id=$2,subscription=$3,created_at=now()',[b.endpoint,user.id,b]);return send(200,{ok:true});}
+  if(method==='DELETE'){const b=await readBody();if(typeof b.endpoint!=='string')fail(400,'訂閱格式錯誤');await db.query('delete from school_push_subscriptions where endpoint=$1 and account_id=$2',[b.endpoint,user.id]);return send(200,{ok:true});}
+ }
+ if(resource==='notification-settings'){
+  if(method==='GET'){const row=(await db.query('select announcements,homework,points,feedback from school_notification_settings where account_id=$1',[user.id])).rows[0];return send(200,row||{announcements:true,homework:true,points:true,feedback:true});}
+  if(method==='PUT'){const b=await readBody();if(!['announcements','homework','points','feedback'].every(k=>typeof b[k]==='boolean'))fail(400,'通知設定格式錯誤');return send(200,(await db.query('insert into school_notification_settings(account_id,announcements,homework,points,feedback) values($1,$2,$3,$4,$5) on conflict(account_id) do update set announcements=$2,homework=$3,points=$4,feedback=$5 returning announcements,homework,points,feedback',[user.id,b.announcements,b.homework,b.points,b.feedback])).rows[0]);}
+ }
+ if(resource==='notifications'){
+  if(method==='GET')return send(200,(await db.query('select id,kind,title,created_at,read_at from school_notifications where account_id=$1 order by id desc limit 100',[user.id])).rows);
+  if(method==='PATCH'&&!id){await db.query('update school_notifications set read_at=now() where account_id=$1 and read_at is null',[user.id]);return send(200,{ok:true});}
+ }
  if(resource==='attachments'){
   const visible=async post=>{if(!uuid(post))fail(400,'公告格式錯誤');const a=(await db.query('select * from announcements704 where id=$1',[post])).rows[0];if(!a||(user.role==='student'&&!['學生','全部人員','全校學生','七年級','八年級','九年級'].includes(a.audience)))fail(404,'找不到公告');return a;};
   if(method==='GET'&&!id){const post=query.get('post');await visible(post);return send(200,(await db.query('select id,name,octet_length(bytes) as size from school_attachments where announcement_id=$1 and complete order by created_at',[post])).rows);}
@@ -50,8 +89,9 @@ export async function schoolRoutes({path,query,method,user,readBody,send}){
  }
  if(resource==='points'){
   if(method==='GET')return send(200,(await db.query("select a.id,a.display_name,a.nickname,coalesce(sum(p.amount),0)::integer as points from accounts704 a left join school_points p on p.student_id=a.id where a.role='student' and not a.disabled group by a.id order by points desc,a.display_name")).rows);
-  requireRole(teacher(user));if(method==='POST'){const b=await readBody();if(!uuid(b.student_id)||!Number.isInteger(b.amount)||b.amount===0||Math.abs(b.amount)>10000)fail(400,'請選擇學生並輸入非零整數分數');await students([b.student_id]);return send(201,(await db.query('insert into school_points(id,student_id,author_id,amount,reason) values($1,$2,$3,$4,$5) returning *',[randomUUID(),b.student_id,user.id,b.amount,text(b.reason,500)])).rows[0]);}
+  requireRole(teacher(user));if(method==='POST'){const b=await readBody(),selected=await students(Array.isArray(b.students)?b.students:[b.student_id]);if(!Number.isInteger(b.amount)||b.amount===0||Math.abs(b.amount)>10000||typeof (b.reason??'')!=='string'||(b.reason??'').length>500)fail(400,'請選擇學生並輸入有效分數');return send(201,await transaction(async c=>{const rows=[];for(const student of selected)rows.push((await c.query('insert into school_points(id,student_id,author_id,amount,reason) values($1,$2,$3,$4,$5) returning *',[randomUUID(),student,user.id,b.amount,(b.reason??'').trim()])).rows[0]);return rows;}));}
  }
+ if(resource==='point-log'&&method==='GET'){requireRole(teacher(user));return send(200,(await db.query('select p.*,a.display_name as student,t.display_name as author from school_points p join accounts704 a on a.id=p.student_id left join accounts704 t on t.id=p.author_id order by p.created_at desc limit 500')).rows);}
  if(resource==='chat-stats'){
   requireRole(user.role==='admin');
   if(method==='GET')return send(200,(await db.query("select a.id,a.display_name,a.nickname,a.chat_muted,count(m.id)::integer as count from accounts704 a left join school_messages m on m.author_id=a.id and m.created_at >= date_trunc('month',now() at time zone 'Asia/Taipei') at time zone 'Asia/Taipei' where a.role='student' and not a.disabled group by a.id order by count desc,a.display_name")).rows);

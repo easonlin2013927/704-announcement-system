@@ -4,6 +4,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { db, migrate } from "./db.mjs";
 import { verify, digest, hash } from "./password.mjs";
 import { migrateSchool, schoolRoutes } from "./school.mjs";
+import webpush from "web-push";
 const origin = process.env.ALLOWED_ORIGIN;
 if (!origin) throw new Error("ALLOWED_ORIGIN is required");
 const attempts = new Map();
@@ -29,6 +30,13 @@ async function body(req) {
 function fail(status, message, code) { throw Object.assign(new Error(message),{status,code}); }
 await migrate();
 await migrateSchool();
+const generatedPushKeys=webpush.generateVAPIDKeys();
+await db.query('insert into school_push_keys(id,public_key,private_key) values(1,$1,$2) on conflict(id) do nothing',[generatedPushKeys.publicKey,generatedPushKeys.privateKey]);
+const pushKeys=(await db.query('select public_key,private_key from school_push_keys where id=1')).rows[0];
+webpush.setVapidDetails('mailto:admin@example.com',pushKeys.public_key,pushKeys.private_key);
+let pushBusy=false;
+const pushTimer=setInterval(async()=>{if(pushBusy)return;pushBusy=true;try{const pending=await db.query("select n.id,n.title,s.endpoint,s.subscription,a.role from school_notifications n join accounts704 a on a.id=n.account_id join school_push_subscriptions s on s.account_id=n.account_id and n.created_at>=s.created_at left join school_push_delivery d on d.notification_id=n.id and d.endpoint=s.endpoint where d.notification_id is null order by n.id limit 25");for(const item of pending.rows){try{await webpush.sendNotification(item.subscription,JSON.stringify({title:'704班級系統',body:item.title,url:item.role==='student'?'./?app=student#/student/login':item.role==='admin'?'./#/admin/login':'./?app=teacher#/teacher/login'}));await db.query('insert into school_push_delivery(notification_id,endpoint) values($1,$2) on conflict do nothing',[item.id,item.endpoint]);}catch(error){if(error.statusCode===404||error.statusCode===410)await db.query('delete from school_push_subscriptions where endpoint=$1',[item.endpoint]);}}}catch{console.error('Push delivery temporarily unavailable');}finally{pushBusy=false;}},15000);
+pushTimer.unref();
 const server = createServer(async (req,res) => {
  const send = (code,data) => { res.writeHead(code,{"Content-Type":"application/json; charset=utf-8"});res.end(JSON.stringify(data)); };
  res.setHeader("Cache-Control","no-store");
