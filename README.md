@@ -1,5 +1,17 @@
 # 704公告系統
 
+## v0.14.0 班級生活功能
+
+- **作業簿**：管理員建立科目；教師與小老師可分日期登錄多項功課、各設截止日，預設全班，也可指定學生。學生可勾選自己的完成紀錄。
+- **缺交與個別評語**：教師或管理員勾選學生新增紀錄，在當事學生首頁及「我的提醒」顯示，可標記已補交。
+- **學生聊天**：學生可私訊、自建群組、加入成員、退出群組、收回或檢舉訊息；管理員可停用聊天及處理被檢舉訊息。
+- **行事曆**：整合作業截止日、活動開始與結束時間，以及各使用者自己的代辦事項。
+- **新增選單**：補上作業、缺交、評語、個人事項，修正捲動時浮在導覽列上方的問題。
+
+閱讀[學生操作手冊](docs/wiki/Student-Life.md)及[教師／管理員手冊](docs/wiki/Classroom-Management.md)。全部資料集中保存在 PostgreSQL，不使用瀏覽器本機儲存。聊天每 5 秒更新，歷史訊息可分頁載入；目前不提供附件、已讀回條及推播通知。
+
+GitHub Wiki：[學生班級生活手冊](https://github.com/easonlin2013927/704-announcement-system/wiki/StudentLife) · [教師與管理員班級管理手冊](https://github.com/easonlin2013927/704-announcement-system/wiki/Classroom)。
+
 v0.13.0 新增「小老師」獨立身分，與教師共用教師登入入口。小老師可發布、編輯及刪除公告和活動，管理自己發布公告的評論，並使用個人化設定；不能查看或管理帳號、修改網站標語、跑馬公告或系統管理設定。管理員可在帳號管理建立或編輯時選擇「小老師」。詳見[小老師手冊](docs/wiki/Assistant-Guide.md)。
 
 v0.12.0：頁首改用公告鈴鐺圖示。教師與管理員從「新增 → 公告」開啟部落格編輯工作室，可直接貼上截圖（Ctrl＋V）或選取圖片，網址會自動成為可點擊的超連結。圖片壓縮後隨公告保存於雲端。
@@ -14,10 +26,10 @@ v0.12.0 起，學生、教師與維護人員頁首統一顯示「班級公告」
 
 | 身分 | 登入連結 | 功能 |
 | --- | --- | --- |
-| 小老師 | [小老師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.13.0#/teacher/login) | 公告與活動管理，無帳號管理權限 |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.13.0#/student/login) | 閱讀、搜尋及分類公告 |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.13.0#/teacher/login) | 發布、編輯、刪除與置頂公告 |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.13.0#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
+| 小老師 | [教師／小老師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/teacher/login) | 公告與活動管理，無帳號管理權限 |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/student/login) | 閱讀、搜尋及分類公告 |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/teacher/login) | 發布、編輯、刪除與置頂公告 |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/admin/login) | 公告管理、帳號管理、跑馬公告與系統狀態 |
 
 三個登入畫面獨立，沒有跨身分切換按鈕。根網址預設進入學生登入。連結只是入口，權限由後端帳號角色決定；錯誤入口會拒絕登入，不能用網址升級權限。切換入口會清除目前登入狀態。
 

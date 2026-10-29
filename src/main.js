@@ -1,7 +1,7 @@
-import { cloud } from "./cloud.js?v=0.14.0";
+import { cloud } from "./cloud.js?v=0.14.0-release";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.14.0';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.14.0-release';
 
 let activeRole = portalRole(location.hash);
 window.addEventListener("hashchange", () => {
@@ -458,7 +458,7 @@ function renderEditor() {
   const canManageComments=!existing||state.session.role==="admin"||existing.author_id===state.session.id;
   app.innerHTML = `${headerTemplate()}<main class="editor-shell blog-studio">
     <button class="back-button" id="cancel-edit">${icon("back", 18)} 取消並返回</button>
-    <div class="editor-heading studio-heading"><div><span class="eyebrow dark">704 · PUBLISHING STUDIO · v0.12.0</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>寫下班級的新消息，讓重要的事被看見。</p></div><button type="button" class="secondary-button" id="focus-writing" aria-pressed="false">專注寫作</button></div>
+    <div class="editor-heading studio-heading"><div><span class="eyebrow dark">704 · PUBLISHING STUDIO · v0.14.0</span><h1>${existing ? "編輯公告" : "發布新公告"}</h1><p>寫下班級的新消息，讓重要的事被看見。</p></div><button type="button" class="secondary-button" id="focus-writing" aria-pressed="false">專注寫作</button></div>
     <form id="editor-form" class="editor-card studio-form">
       <div class="studio-workspace">
       <section class="studio-document" aria-label="文章編輯區">

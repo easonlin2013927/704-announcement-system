@@ -1,5 +1,12 @@
 # 704公告系統使用中心
 
+## 班級生活功能（v0.14.0）
+
+- [學生操作手冊](Student-Life.md)：作業勾選、私人提醒、聊天與個人行事曆，僅包含學生操作。
+- [教師與管理員操作手冊](Classroom-Management.md)：科目、作業、缺交、評語、聊天管理及學校網路連線排解。
+
+學生首頁會顯示自己的待補交及評語提醒。作業截止日、活動起訖時間與個人事項整合在行事曆；全部資料保存於雲端帳號。
+
 - [個人化設定](Personalization.md)：7 種風格、頭像、暱稱與跨裝置保存。
 - 公告支援可選擇開啟的評論區，留言顯示頭像與原名稱（暱稱）。
 
@@ -7,9 +14,9 @@
 
 | 身分 | 登入網址 |
 | --- | --- |
-| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.0#/student/login) |
-| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.0#/teacher/login) |
-| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.10.0#/admin/login) |
+| 學生 | [學生登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/student/login) |
+| 教師 | [教師登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/teacher/login) |
+| 維護人員（管理員） | [維護人員登入](https://easonlin2013927.github.io/704-announcement-system/?v=0.14.0#/admin/login) |
 
 請使用符合帳號角色的入口。三個畫面獨立，切換網址不會取得不同角色權限。
 

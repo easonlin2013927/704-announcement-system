@@ -15,11 +15,11 @@ jobs:
         with:
           node-version: 22
       - run: node --test server/password.test.mjs
-      - run: node --check server/index.mjs && node --check server/account.mjs && npm run check && npm run build
+      - run: node --check server/index.mjs && node --check server/account.mjs && node --check server/school.mjs && node --check src/school.js && npm run check && npm run build
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.13.1 >/dev/null 2>&1; then
-            gh release create v0.13.1 --target "$GITHUB_SHA" --title "v0.13.1 首頁公告標題調整" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.14.0 >/dev/null 2>&1; then
+            gh release create v0.14.0 --target "$GITHUB_SHA" --title "v0.14.0 作業簿、學生提醒、聊天與行事曆" --notes-file deploy/RELEASE.md
           fi
