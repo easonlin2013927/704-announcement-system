@@ -1,11 +1,12 @@
-import { cloud } from "./cloud.js?v=0.17.1";
+import { cloud } from "./cloud.js?v=0.17.2";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.17.1';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.17.2';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
 setupPwa(activeRole);
+const isPwaWindow=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;if(activeRole!=='admin')render();});
 window.addEventListener('appinstalled',()=>{installPrompt=null;render();});
@@ -176,7 +177,7 @@ function toast(message, tone = "success") {
 function render() {
   disposeSchool();
   applyTheme(state.session?.theme || "dark");
-  if(activeRole!=='admin'&&!matchMedia('(display-mode: standalone)').matches&&!navigator.standalone)return renderInstallGuide();
+  if(activeRole!=='admin'&&!isPwaWindow())return renderInstallGuide();
   if (!state.session) return renderLogin();
   if (state.session.must_change_password) return renderPasswordChange();
   if (state.settingsOpen) return renderSettings();
@@ -792,4 +793,4 @@ function renderSiteSettings() {
 
 render();
 refreshBanner();
-cloud.me().then(async profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;state.session={...profile,name:profile.display_name};if(!profile.must_change_password){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();}render();}).catch(()=>{});
+if(activeRole==='admin'||isPwaWindow())cloud.me().then(async profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;state.session={...profile,name:profile.display_name};if(!profile.must_change_password){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();}render();}).catch(()=>{});
