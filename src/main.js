@@ -1,7 +1,7 @@
-import { cloud } from "./cloud.js?v=0.16.0";
+import { cloud } from "./cloud.js?v=0.16.1";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.16.0';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.16.1';
 
 let activeRole = portalRole(location.hash);
 window.addEventListener("hashchange", () => {
