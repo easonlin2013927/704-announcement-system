@@ -92,7 +92,7 @@ const server = createServer(async (req,res) => {
  }catch(error){await client.query("rollback");throw error;}finally{client.release();}
  }
  if(user.must_change_password) fail(403,"請先變更密碼","PASSWORD_CHANGE_REQUIRED");
- if(path.startsWith('/school/'))return await schoolRoutes({path,method:req.method,user,readBody:()=>body(req),send});
+ if(path.startsWith('/school/'))return await schoolRoutes({path,query:new URL(req.url,'http://localhost').searchParams,method:req.method,user,readBody:()=>body(req),send});
  if(path==="/me"&&req.method==="GET")return send(200,profile((await db.query("select * from accounts704 where id=$1",[user.id])).rows[0]));
  if(path==="/me"&&req.method==="PATCH"){
  const value=await body(req);

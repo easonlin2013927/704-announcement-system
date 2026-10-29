@@ -29,7 +29,7 @@ export async function migrateSchool(){await db.query(`
  create index if not exists school_records_student on school_records(student_id,record_day);
  create index if not exists school_plans_owner on school_plans(owner_id,start_at);
  `);}
-export async function schoolRoutes({path,method,user,readBody,send}){
+export async function schoolRoutes({path,query,method,user,readBody,send}){
  const tail=path.slice('/school/'.length).split('/');const [resource,id,action]=tail;
  if(resource==='students'&&method==='GET'){requireRole(staff(user));return send(200,(await db.query("select id,display_name,nickname from accounts704 where role='student' and not disabled order by display_name")).rows);}
  if(resource==='subjects'){
@@ -76,7 +76,7 @@ export async function schoolRoutes({path,method,user,readBody,send}){
   if(uuid(id)&&action==='leave'&&method==='POST'){const room=await membership(id,user);if(room.kind==='direct')fail(400,'私訊無須退出');await db.query('delete from school_members where room_id=$1 and account_id=$2',[id,user.id]);return send(200,{ok:true});}
   if(uuid(id)&&action==='messages'){
    await membership(id,user);
-   if(method==='GET')return send(200,(await db.query(`select m.id,m.author_id,m.author_name,case when m.deleted then '此訊息已移除' else m.content end as content,m.deleted,m.created_at,a.nickname from school_messages m left join accounts704 a on a.id=m.author_id where room_id=$1 order by created_at desc,id desc limit 200`,[id])).rows.reverse());
+   if(method==='GET'){const before=query?.get('before')||null;if(before&&!uuid(before))fail(400,'訊息游標錯誤');return send(200,(await db.query(`select m.id,m.author_id,m.author_name,case when m.deleted then '此訊息已移除' else m.content end as content,m.deleted,m.created_at,a.nickname from school_messages m left join accounts704 a on a.id=m.author_id where room_id=$1 and ($2::uuid is null or (m.created_at,m.id)<(select created_at,id from school_messages where id=$2 and room_id=$1)) order by m.created_at desc,m.id desc limit 200`,[id,before])).rows.reverse());}
    if(method==='POST'){const b=await readBody();return send(201,await transaction(async c=>{await chatOpen(c);await membership(id,user,c);return (await c.query('insert into school_messages(id,room_id,author_id,author_name,content) values($1,$2,$3,$4,$5) returning id',[randomUUID(),id,user.id,user.display_name,text(b.content,5000)])).rows[0];}));}
   }
  }

@@ -50,6 +50,10 @@ try{
  assert.equal((await call(a,'reports')).status,403);assert.ok((await call(admin,'reports')).value.some(r=>r.id===report.value.id));
  assert.equal((await call(admin,'reports/'+report.value.id,'PATCH',{remove_message:true})).status,200);
  assert.equal((await call(b,`rooms/${direct.value.id}/messages`)).value[0].deleted,true);
+ await db.query("insert into school_messages(id,room_id,author_id,author_name,content) select gen_random_uuid(),$1,$2,$3,'history fixture' from generate_series(1,201)",[direct.value.id,a.id,prefix]);
+ const recent=await call(a,`rooms/${direct.value.id}/messages`);assert.equal(recent.value.length,200);
+ const earlier=await call(a,`rooms/${direct.value.id}/messages?before=${recent.value[0].id}`);assert.equal(earlier.value.length,2);
+ assert.ok(!earlier.value.some(m=>recent.value.some(x=>x.id===m.id)));
  const group=await call(a,'rooms','POST',{kind:'group',title:prefix,members:[b.id]});if(group.value.id)rooms.push(group.value.id);assert.equal(group.status,201);
  assert.equal((await call(b,`rooms/${group.value.id}/members`,'POST',{members:[outsider.id]})).status,403);
  assert.equal((await call(a,`rooms/${group.value.id}/members`,'POST',{members:[outsider.id]})).status,200);
