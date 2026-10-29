@@ -31,11 +31,23 @@ export async function migrateSchool(){await db.query(`
  alter table school_reports add column if not exists target_id uuid references accounts704(id) on delete set null;
  alter table accounts704 add column if not exists chat_muted boolean not null default false;
  create table if not exists school_points(id uuid primary key,student_id uuid not null references accounts704(id) on delete cascade,author_id uuid references accounts704(id) on delete set null,amount integer not null,reason text not null,created_at timestamptz not null default now());
+ create table if not exists school_attachments(id uuid primary key,announcement_id uuid not null references announcements704(id) on delete cascade,name text not null,owner_id uuid references accounts704(id) on delete set null,bytes bytea not null default ''::bytea,complete boolean not null default false,created_at timestamptz not null default now());
  create index if not exists school_records_student on school_records(student_id,record_day);
  create index if not exists school_plans_owner on school_plans(owner_id,start_at);
  `);}
 export async function schoolRoutes({path,query,method,user,readBody,send}){
  const tail=path.slice('/school/'.length).split('/');const [resource,id,action]=tail;
+ if(resource==='attachments'){
+  const visible=async post=>{if(!uuid(post))fail(400,'公告格式錯誤');const a=(await db.query('select * from announcements704 where id=$1',[post])).rows[0];if(!a||(user.role==='student'&&!['學生','全部人員','全校學生','七年級','八年級','九年級'].includes(a.audience)))fail(404,'找不到公告');return a;};
+  if(method==='GET'&&!id){const post=query.get('post');await visible(post);return send(200,(await db.query('select id,name,octet_length(bytes) as size from school_attachments where announcement_id=$1 and complete order by created_at',[post])).rows);}
+  if(method==='POST'&&!id){requireRole(staff(user));const b=await readBody();await visible(b.announcement_id);return send(201,(await db.query('insert into school_attachments(id,announcement_id,name,owner_id) values($1,$2,$3,$4) returning id',[randomUUID(),b.announcement_id,text(b.name,255),user.id])).rows[0]);}
+  if(uuid(id)){const item=(await db.query('select * from school_attachments where id=$1',[id])).rows[0];if(!item)fail(404,'找不到附件');await visible(item.announcement_id);
+   if(method==='GET'){if(!item.complete)fail(404,'附件尚未完成');return send(200,{name:item.name,data:item.bytes.toString('base64')});}
+   requireRole(staff(user));if(item.owner_id!==user.id&&user.role!=='admin')fail(403,'沒有管理此附件的權限');
+   if(method==='DELETE'){await db.query('delete from school_attachments where id=$1',[id]);return send(200,{ok:true});}
+   if(method==='PATCH'){const b=await readBody();if(typeof b.data!=='string'||!/^[A-Za-z0-9+/]*={0,2}$/.test(b.data)||typeof b.complete!=='boolean')fail(400,'附件格式錯誤');const chunk=Buffer.from(b.data,'base64');if(chunk.length>100000)fail(400,'上傳區塊過大');const result=await db.query('update school_attachments set bytes=bytes || $1::bytea,complete=$2 where id=$3 and not complete and octet_length(bytes)+$4<=200000 returning id',[chunk,b.complete,id,chunk.length]);if(!result.rowCount)fail(400,'附件超過 200 KB 或已完成');return send(200,result.rows[0]);}
+  }
+ }
  if(resource==='points'){
   if(method==='GET')return send(200,(await db.query("select a.id,a.display_name,a.nickname,coalesce(sum(p.amount),0)::integer as points from accounts704 a left join school_points p on p.student_id=a.id where a.role='student' and not a.disabled group by a.id order by points desc,a.display_name")).rows);
   requireRole(teacher(user));if(method==='POST'){const b=await readBody();if(!uuid(b.student_id)||!Number.isInteger(b.amount)||b.amount===0||Math.abs(b.amount)>10000)fail(400,'請選擇學生並輸入非零整數分數');await students([b.student_id]);return send(201,(await db.query('insert into school_points(id,student_id,author_id,amount,reason) values($1,$2,$3,$4,$5) returning *',[randomUUID(),b.student_id,user.id,b.amount,text(b.reason,500)])).rows[0]);}
