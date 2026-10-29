@@ -1,4 +1,4 @@
-import { config } from "./config.js?v=0.16.1";
+import { config } from "./config.js?v=0.16.2";
 let token = null;
 async function request(path, options = {}) {
   if (!config.url) throw new Error("系統尚未設定雲端服務，請聯絡管理員。");
@@ -22,6 +22,9 @@ async function request(path, options = {}) {
 }
 export const cloud = {
   school(path,method='GET',value){return request('/school/'+path,{method,...(value===undefined?{}:{body:JSON.stringify(value)})});},
+  attachments(post){return request('/school/attachments?post='+encodeURIComponent(post));},
+  async uploadAttachment(post,file){if(file.size>200000)throw new Error('單一附件不能超過 200 KB');const entry=await request('/school/attachments',{method:'POST',body:JSON.stringify({announcement_id:post,name:file.name})});try{const bytes=new Uint8Array(await file.arrayBuffer());for(let i=0;i<bytes.length||i===0;i+=100000){const part=bytes.subarray(i,i+100000);let binary='';for(const byte of part)binary+=String.fromCharCode(byte);await request('/school/attachments/'+entry.id,{method:'PATCH',body:JSON.stringify({data:btoa(binary),complete:i+part.length>=bytes.length})});}}catch(e){await request('/school/attachments/'+entry.id,{method:'DELETE'}).catch(()=>{});throw e;}},
+  attachment(id){return request('/school/attachments/'+encodeURIComponent(id));},
   async login(email, password, portal) {
     token = null;
     const result = await request("/login", { method: "POST", body: JSON.stringify({ email, password, portal }) });

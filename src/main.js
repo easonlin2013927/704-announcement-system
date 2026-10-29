@@ -1,7 +1,7 @@
-import { cloud } from "./cloud.js?v=0.16.1";
+import { cloud } from "./cloud.js?v=0.16.2";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.16.1';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.16.2';
 
 let activeRole = portalRole(location.hash);
 window.addEventListener("hashchange", () => {
@@ -443,11 +443,13 @@ function renderDetail() {
       <header><div class="article-tags"><span class="category-tag ${category.tone}">${item.pinned ? icon("pin", 13) : ""}${category.label}</span><span class="audience-tag">${icon("users", 14)} ${escapeHtml(item.audience)}</span></div>
       <h1>${escapeHtml(item.title)}</h1><div class="article-byline">${avatarMarkup(item.author,item.author_avatar)}<div><strong>${escapeHtml(identityName(item.author,item.author_nickname))}</strong><span>${icon("clock", 14)} 發布於 ${formatDate(item.date, true)}</span></div></div></header>
       <div class="rich-content">${sanitizeHtml(item.content)}</div>
+      <section class="attachment-section"><h2>附件</h2><div id="attachment-list">載入中…</div></section>
       ${isTeacher ? `<footer class="article-controls"><button class="secondary-button" id="edit-post">${icon("edit", 17)} 編輯公告</button><button class="danger-button" id="delete-post">${icon("trash", 17)} 刪除</button></footer>` : ""}
     </article><section class="editor-card comments-panel" aria-label="公告評論"><h2>評論</h2><p id="comments-message" role="status">載入評論中…</p><div id="comments-list"></div><form id="comment-form" class="comment-form" hidden><label for="comment-content">發表評論</label><textarea id="comment-content" name="content" maxlength="2000" required placeholder="輸入評論…"></textarea><button class="primary-button">送出評論</button></form></section>
   </main>`;
   bindHeader();
   bindComments(item);
+  const attachmentList=document.querySelector('#attachment-list');cloud.attachments(item.id).then(rows=>{if(!attachmentList.isConnected)return;attachmentList.innerHTML=rows.length?rows.map(a=>`<p><button class="secondary-button" type="button" data-download-attachment="${escapeHtml(a.id)}">${escapeHtml(a.name)}（${Math.ceil(a.size/1024)} KB）</button></p>`).join(''):'沒有附件';attachmentList.querySelectorAll('[data-download-attachment]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const a=await cloud.attachment(b.dataset.downloadAttachment);const binary=atob(a.data),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([bytes],{type:'application/octet-stream'}));link.download=a.name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),60000);}catch(e){toast(e.message,'error');}finally{b.disabled=false;}});}).catch(e=>{attachmentList.textContent=e.message;});
   document.querySelector("#back").addEventListener("click", () => { state.selectedId = null; render(); });
   document.querySelector("#edit-post")?.addEventListener("click", () => { state.editingId = item.id; state.selectedId = null; render(); });
   document.querySelector("#delete-post")?.addEventListener("click", () => deleteAnnouncement(item.id));
@@ -475,6 +477,7 @@ function renderEditor() {
       </div>
       <div class="editor-options"><label class="switch-row"><input type="checkbox" name="pinned" ${existing?.pinned ? "checked" : ""}><span class="switch"></span><span><strong>置頂公告</strong><small>讓這則公告優先顯示在列表最上方</small></span></label></div>
       ${canManageComments?`<label class="check-option"><input type="checkbox" name="comments_enabled" ${existing?.comments_enabled?"checked":""}>開啟評論區</label>`:'<p class="muted">評論區開關由公告張貼者或管理員設定。</p>'}
+      <label>新增附件（每個檔案最多 200 KB）<input type="file" id="announcement-files" multiple></label>
       <button class="primary-button studio-publish" type="submit">${existing ? "儲存變更" : "發布公告"}</button><p class="studio-save-note">內容在按下${existing ? "儲存" : "發布"}後才會保存至雲端。</p></div>
       <div class="studio-panel"><h2>文章概覽</h2><p id="article-summary" class="muted"></p><h3>文章大綱</h3><ul id="article-outline" class="studio-outline"></ul></div>
       </aside></div>
@@ -517,6 +520,7 @@ function renderEditor() {
   document.querySelector("#editor-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const attachmentFiles=[...document.querySelector('#announcement-files').files];if(attachmentFiles.some(file=>file.size>200000)){toast('單一附件不能超過 200 KB','error');return;}
     if (!stripHtml(editor.innerHTML).trim() && !editor.querySelector("img")) { toast("請輸入公告內容或貼上圖片", "error"); setWritingMode(false); editor.focus(); return; }
     if (new TextEncoder().encode(JSON.stringify({content:sanitizeHtml(editor.innerHTML)})).length > 240000) { toast("公告圖片總量過大，請減少圖片後再發布", "error"); return; }
     const announcement = {
@@ -527,10 +531,13 @@ function renderEditor() {
     if(canManageComments)announcement.comments_enabled=data.get("comments_enabled")==="on";
     const publishButtons = form.querySelectorAll('[type="submit"]');
     publishButtons.forEach(button => button.disabled = true);
+    let announcementSaved=false;
     try {
       await cloud.save(announcement, Boolean(existing));
+      announcementSaved=true;
+      for(const file of attachmentFiles)await cloud.uploadAttachment(announcement.id,file);
       state.announcements=await cloud.list();
-    } catch (error) { toast(error.message, "error"); publishButtons.forEach(button => button.disabled = false); return; }
+    } catch (error) { if(announcementSaved){state.editingId=announcement.id;try{state.announcements=await cloud.list();render();}catch{}toast('公告已儲存，但附件上傳失敗：'+error.message,'error');}else{toast(error.message, "error");publishButtons.forEach(button => button.disabled = false);}return; }
     state.editingId = null; render(); toast(existing ? "公告已更新" : "公告已發布");
   });
 }
