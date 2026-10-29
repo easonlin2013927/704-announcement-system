@@ -1,7 +1,7 @@
-import { cloud } from "./cloud.js?v=0.14.1";
+import { cloud } from "./cloud.js?v=0.15.0";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.14.1';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.15.0';
 
 let activeRole = portalRole(location.hash);
 window.addEventListener("hashchange", () => {
@@ -699,6 +699,11 @@ function renderPersonalization(){
  app.innerHTML=`${headerTemplate()}<main class="editor-shell settings-shell">${settingsTabs()}<div class="editor-heading"><span class="eyebrow dark">PERSONALIZATION</span><h1>個人化</h1><p>選擇系統風格、設定頭像與暱稱，儲存後會跟隨帳號保留。</p></div><form id="profile-form" class="editor-card"><h2>個人資料</h2><div class="profile-preview"><div id="profile-avatar">${avatarMarkup(state.session.name,avatar,"large")}</div><div><strong id="profile-name">${escapeHtml(identityName(state.session.name,state.session.nickname))}</strong><small>原顯示名稱：${escapeHtml(state.session.name)}</small></div></div><label for="nickname">暱稱</label><input id="nickname" name="nickname" maxlength="80" value="${escapeHtml(state.session.nickname||"")}" placeholder="可留空，仍會保留原顯示名稱"><label class="editor-label" for="avatar-file">上傳頭像</label><div class="profile-upload"><input id="avatar-file" type="file" accept="image/png,image/jpeg,image/webp"><button type="button" class="secondary-button" id="remove-avatar">移除頭像</button></div><p class="muted">PNG、JPEG、WebP，原圖最多 5 MB；系統會裁切成正方形並壓縮保存。</p><h2>系統風格</h2><div class="theme-grid" role="group" aria-label="選擇系統風格">${themes.map(option=>`<button type="button" class="theme-card" data-theme-choice="${option.id}" aria-pressed="${option.id===theme}" style="--preview-bg:${option.bg};--preview-surface:${option.surface};--preview-ink:${option.text};--preview-accent:${option.accent}"><div class="theme-preview"><div class="theme-preview-bar"></div><div class="theme-preview-panel">704 公告預覽</div></div><strong>${option.name}</strong><small>${option.description}</small></button>`).join("")}</div><p id="profile-message" role="status"></p><footer class="editor-footer"><span>風格可即時預覽，按儲存才會保存到帳號。</span><button class="primary-button" id="save-profile">儲存個人化設定</button></footer></form></main>`;
  bindHeader();bindSettingsTabs();
  const form=document.querySelector("#profile-form"),file=document.querySelector("#avatar-file"),message=document.querySelector("#profile-message"),save=document.querySelector("#save-profile");
+ form.insertAdjacentHTML('afterend',`<form id="wallpaper-form" class="editor-card"><h2>儀表板桌布</h2><p>可上傳靜態圖片或動態 GIF，檔案大小最多 150 KB。</p><input id="wallpaper-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"><div class="school-actions"><button class="primary-button" type="submit">儲存桌布</button><button class="secondary-button" type="button" id="wallpaper-remove">移除桌布</button></div><p id="wallpaper-message" role="status"></p></form>`);
+ const wallpaperForm=document.querySelector('#wallpaper-form'),wallpaperFile=document.querySelector('#wallpaper-file'),wallpaperMessage=document.querySelector('#wallpaper-message');
+ const saveWallpaper=async value=>{const result=await cloud.school('wallpaper','PUT',{wallpaper_url:value});state.session={...state.session,...result,name:result.display_name};wallpaperMessage.textContent='桌布已儲存';};
+ wallpaperForm.addEventListener('submit',async event=>{event.preventDefault();try{const image=wallpaperFile.files[0];if(!image||image.size>150000||!['image/png','image/jpeg','image/webp','image/gif'].includes(image.type))throw Error('請選擇 150 KB 以下的 PNG、JPEG、WebP 或 GIF');const value=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('讀取圖片失敗'));reader.readAsDataURL(image);});await saveWallpaper(value);}catch(error){wallpaperMessage.textContent=error.message;}});
+ document.querySelector('#wallpaper-remove').addEventListener('click',async()=>{try{await saveWallpaper('');wallpaperFile.value='';}catch(error){wallpaperMessage.textContent=error.message;}});
  const preview=()=>{document.querySelector("#profile-avatar").innerHTML=avatarMarkup(state.session.name,avatar,"large");document.querySelector("#profile-name").textContent=identityName(state.session.name,form.elements.nickname.value);};
  form.elements.nickname.addEventListener("input",preview);
  file.addEventListener("change",async()=>{if(!file.files[0])return;save.disabled=true;try{avatar=await prepareAvatar(file.files[0]);preview();message.textContent="頭像已準備完成，請儲存設定。";}catch(error){message.textContent=error.message;file.value="";}finally{save.disabled=false;}});
@@ -762,3 +767,4 @@ function renderSiteSettings() {
 
 render();
 refreshBanner();
+cloud.me().then(async profile=>{if((profile.role==='assistant'?'teacher':profile.role)!==activeRole)return;state.session={...profile,name:profile.display_name};if(!profile.must_change_password){state.announcements=await cloud.list();state.countdowns=await cloud.countdowns();}render();}).catch(()=>{});

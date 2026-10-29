@@ -1,4 +1,4 @@
-import { config } from "./config.js?v=0.14.1";
+import { config } from "./config.js?v=0.15.0";
 let token = null;
 async function request(path, options = {}) {
   if (!config.url) throw new Error("系統尚未設定雲端服務，請聯絡管理員。");
@@ -6,6 +6,7 @@ async function request(path, options = {}) {
   try {
     response = await fetch(config.url.replace(/\/$/, "") + path, {
       ...options,
+      credentials: "include",
       headers: { ...(token ? { Authorization: "Bearer " + token } : {}),
         "Content-Type": "application/json", ...options.headers },
       cache: "no-store",
@@ -13,7 +14,7 @@ async function request(path, options = {}) {
   } catch { throw new Error("無法連接公告服務，請確認網路或聯絡管理員。"); }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    if(response.status===401&&token){token=null;window.dispatchEvent(new Event("session-expired"));}
+    if(response.status===401&&(token||path!=="/login")){token=null;window.dispatchEvent(new Event("session-expired"));}
     if(data.code==="PASSWORD_CHANGE_REQUIRED")window.dispatchEvent(new Event("password-required"));
     throw Object.assign(new Error(data.message || "雲端操作失敗，請稍後重試。"),{code:data.code});
   }
@@ -28,7 +29,7 @@ export const cloud = {
     return result.profile;
   },
   logout() {
-    if (token) request("/logout", { method: "POST" }).catch(() => {});
+    request("/logout", { method: "POST" }).catch(() => {});
     token = null;
   },
   async changePassword(value){const result=await request("/account/password",{method:"POST",body:JSON.stringify(value)});token=result.token;return result.profile;},

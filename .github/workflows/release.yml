@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.14.2 >/dev/null 2>&1; then
-            gh release create v0.14.2 --target "$GITHUB_SHA" --title "v0.14.2 學生帳號管理與固定登入網址" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.15.0 >/dev/null 2>&1; then
+            gh release create v0.15.0 --target "$GITHUB_SHA" --title "v0.15.0 儀表板、成績簿與帳號功能" --notes-file deploy/RELEASE.md
           fi
