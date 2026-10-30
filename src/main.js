@@ -1,7 +1,7 @@
-import { cloud } from "./cloud.js?v=0.18.1";
+import { cloud } from "./cloud.js?v=0.18.2";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.18.1';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.18.2';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
@@ -386,7 +386,7 @@ function renderDashboard() {
     <main class="page-shell">
       <section class="hero-row">
         <div><span class="eyebrow dark">${isTeacher ? "TEACHER CONSOLE" : "STUDENT BULLETIN"}</span><h1>${isTeacher ? "公告管理" : "公告"}</h1><p>${isTeacher ? "清楚傳遞每一項班級資訊。" : "今天也別忘了看看班級的新消息。"}</p></div>
-        ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden><button id="new-post">公告</button><button id="new-activity">活動</button><button data-school-create="homework">作業</button>${['teacher','admin'].includes(state.session.role)?'<button data-school-create="missing">缺交項目</button><button data-school-create="feedback">個別評語／提醒</button>':''}<button data-school-create="plan">個人行事曆事項</button></div></div>` : ""}
+        ${isTeacher ? `<div class="create-menu"><button class="primary-button" id="create-toggle" aria-expanded="false" aria-controls="create-options">${icon("plus",18)} 新增</button><div id="create-options" class="create-options" hidden><button id="new-post">公告</button><button id="new-activity">活動</button><button data-school-create="homework">作業</button>${['teacher','admin'].includes(state.session.role)?'<button data-school-create="missing">缺交項目</button><button data-school-create="feedback">個別評語／提醒</button>':''}</div></div>` : ""}
       </section>
       <div id="student-home-overview"></div>
       <section class="toolbar" aria-label="公告篩選">
@@ -405,7 +405,7 @@ function renderDashboard() {
   bindHeader();
   bindActivities();
   loadStudentHome(document.querySelector('#student-home-overview'),state.session,navigateSchool);
-  document.querySelectorAll('[data-school-create]').forEach(b=>b.addEventListener('click',()=>{const type=b.dataset.schoolCreate;navigateSchool(type==='homework'?'homework':type==='plan'?'calendar':'records',type);}));
+  document.querySelectorAll('[data-school-create]').forEach(b=>b.addEventListener('click',()=>{const type=b.dataset.schoolCreate;navigateSchool(type==='homework'?'homework':'records',type);}));
   const menu=document.querySelector(".create-menu"),toggle=document.querySelector("#create-toggle"),options=document.querySelector("#create-options");
   const showMenu=value=>{if(options){options.hidden=!value;toggle.setAttribute("aria-expanded",String(value));}};
   toggle?.addEventListener("click",()=>showMenu(true));
