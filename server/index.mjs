@@ -72,8 +72,9 @@ const server = createServer(async (req,res) => {
  if(account.disabled) fail(403,"帳戶已停用，請聯絡教師或管理員");
  if (!["teacher","student","admin"].includes(data.portal) || data.portal !== (account.role==="assistant"?"teacher":account.role)) fail(403,"帳號不屬於此登入入口");
  const token = randomBytes(32).toString("hex");
- await db.query("insert into sessions704 values($1,$2,now()+interval '8 hours')",[digest(token),account.id]);
- return send(200,{token,profile:profile(account)});
+ if(data.remember!==undefined&&typeof data.remember!=='boolean')fail(400,"登入設定格式錯誤");
+ await db.query("insert into sessions704 values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end)",[digest(token),account.id,data.remember===true]);
+ return send(200,{token,remembered:data.remember===true,profile:profile(account)});
  }
  const token = req.headers.authorization?.replace(/^Bearer /,"") || "";
  const user = (await db.query("select a.id,a.role,a.display_name,a.must_change_password from sessions704 s join accounts704 a on a.id=s.account_id where s.token_hash=$1 and s.expires_at>now() and not a.disabled",[digest(token)])).rows[0];
@@ -86,7 +87,7 @@ const server = createServer(async (req,res) => {
  try{
  await client.query("begin");
  await client.query("lock table accounts704 in share row exclusive mode");
- if(!(await client.query("select 1 from sessions704 where token_hash=$1 and account_id=$2 and expires_at>now()",[digest(token),user.id])).rowCount) fail(401,"登入已失效，請重新登入");
+ const currentSession=(await client.query("select expires_at='infinity'::timestamptz as remembered from sessions704 where token_hash=$1 and account_id=$2 and expires_at>now()",[digest(token),user.id])).rows[0];if(!currentSession) fail(401,"登入已失效，請重新登入");
  const account=(await client.query("select * from accounts704 where id=$1 for update",[user.id])).rows[0];
  if(!account || account.disabled) fail(401,"帳戶已失效，請重新登入");
  if(!await verify(value.current_password,account.password_hash)) fail(400,"目前密碼不正確");
@@ -94,9 +95,9 @@ const server = createServer(async (req,res) => {
  await client.query("update accounts704 set password_hash=$1,must_change_password=false where id=$2",[await hash(value.new_password),user.id]);
  await client.query("delete from sessions704 where account_id=$1",[user.id]);
  const nextToken=randomBytes(32).toString("hex");
- await client.query("insert into sessions704 values($1,$2,now()+interval '8 hours')",[digest(nextToken),user.id]);
+ await client.query("insert into sessions704 values($1,$2,case when $3 then 'infinity'::timestamptz else now()+interval '8 hours' end)",[digest(nextToken),user.id,currentSession.remembered]);
  await client.query("commit");
- return send(200,{token:nextToken,profile:profile({...account,must_change_password:false})});
+ return send(200,{token:nextToken,remembered:currentSession.remembered,profile:profile({...account,must_change_password:false})});
  }catch(error){await client.query("rollback");throw error;}finally{client.release();}
  }
  if(path==="/me"&&req.method==="GET")return send(200,profile((await db.query("select * from accounts704 where id=$1",[user.id])).rows[0]));

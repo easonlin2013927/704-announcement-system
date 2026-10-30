@@ -32,8 +32,8 @@ export async function proxyRequest(request,{fetchUpstream=fetch}={}){
   const upstream=await fetchUpstream(target.href,{method:request.method,headers:upstreamHeaders,body,redirect:'manual',signal:controller.signal,cf:{cacheTtl:0,cacheEverything:false}});
   if(upstream.status>=300&&upstream.status<400)return error(502,'公告服務網址發生重新導向，請聯絡管理員',headers);
   if(!upstream.headers.get('content-type')?.includes('application/json'))return error(502,'公告主機暫時沒有提供正常回應，請稍後再試',headers);
-  if((url.pathname==='/login'||url.pathname==='/account/password')&&upstream.ok){const result=await upstream.json();if(/^[0-9a-f]{64}$/.test(result.token||''))headers.append('Set-Cookie',`__Host-704session=${result.token}; Path=/; Secure; HttpOnly; SameSite=None; Max-Age=28800`);return new Response(JSON.stringify(result),{status:upstream.status,headers});}
-  if(url.pathname==='/logout')headers.append('Set-Cookie','__Host-704session=; Path=/; Secure; HttpOnly; SameSite=None; Max-Age=0');
+  if((url.pathname==='/login'||url.pathname==='/account/password')&&upstream.ok){const result=await upstream.json();if(/^[0-9a-f]{64}$/.test(result.token||'')){headers.append('Set-Cookie','__Host-704session=; Path=/; Secure; HttpOnly; SameSite=None; Max-Age=0');headers.append('Set-Cookie',`__Host-704session=${result.token}; Path=/; Secure; HttpOnly; SameSite=None; Partitioned${result.remembered?'; Max-Age=34560000':''}`);}return new Response(JSON.stringify(result),{status:upstream.status,headers});}
+  if(url.pathname==='/logout'){headers.append('Set-Cookie','__Host-704session=; Path=/; Secure; HttpOnly; SameSite=None; Partitioned; Max-Age=0');headers.append('Set-Cookie','__Host-704session=; Path=/; Secure; HttpOnly; SameSite=None; Max-Age=0');}
   return new Response(upstream.body,{status:upstream.status,headers});
  }catch(e){return error(e.status===413?413:502,e.status===413?'內容過長':'無法連接公告主機，請稍後再試',headers);}
  finally{clearTimeout(timeout);}
