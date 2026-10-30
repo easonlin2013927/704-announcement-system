@@ -1,4 +1,4 @@
-import { cloud } from './cloud.js?v=0.18.2';
+import { cloud } from './cloud.js?v=0.18.3';
 let poll=null;
 export function disposeSchool(){if(poll)clearInterval(poll);poll=null;}
 const esc=(s='')=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -7,7 +7,6 @@ const name=u=>u.display_name+(u.nickname?`（${u.nickname}）`:'');
 const day=d=>{const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;};
 const today=()=>day(new Date());
 const dateOnly=d=>String(d||'').slice(0,10);
-const localTime=d=>{const x=new Date(d);return new Date(x.getTime()-x.getTimezoneOffset()*60000).toISOString().slice(0,16);};
 const stamp=d=>new Date(d).toLocaleString('zh-TW');
 const api=(path,method,value)=>cloud.school(path,method,value);
 const button=(label,attrs='',type='button')=>`<button type="${type}" class="secondary-button" ${attrs}>${label}</button>`;
