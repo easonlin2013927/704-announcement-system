@@ -20,6 +20,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if ! gh release view v0.18.3 >/dev/null 2>&1; then
-            gh release create v0.18.3 --target "$GITHUB_SHA" --title "v0.18.3 移除行事曆資料" --notes-file deploy/RELEASE.md
+          if ! gh release view v0.19.0 >/dev/null 2>&1; then
+            gh release create v0.19.0 --target "$GITHUB_SHA" --title "v0.19.0 記住登入" --notes-file deploy/RELEASE.md
           fi

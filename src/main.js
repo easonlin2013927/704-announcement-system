@@ -1,7 +1,7 @@
-import { cloud } from "./cloud.js?v=0.18.3";
+import { cloud } from "./cloud.js?v=0.19.0";
 import { portals, portalRole } from "./portal.js?v=0.13.0";
 import { themes, applyTheme, prepareAvatar } from "./personalization.js?v=0.10.0";
-import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.18.3';
+import {schoolNav,mountSchool,disposeSchool,loadStudentHome} from './school.js?v=0.19.0';
 
 let activeRole = portalRole(location.hash);
 function setupPwa(role){let link=document.querySelector('link[rel="manifest"]');if(!link){link=document.createElement('link');link.rel='manifest';document.head.append(link);}link.href=role==='teacher'?'./src/teacher.webmanifest':'./src/student.webmanifest';if('serviceWorker' in navigator)navigator.serviceWorker.register('./service-worker.js').catch(()=>{});}
@@ -212,6 +212,7 @@ function renderLogin() {
           <form id="login-form">
             <label>帳號<input name="account" autocomplete="username" placeholder="請輸入帳號" type="text" required></label>
             <label>密碼<input name="password" type="password" autocomplete="current-password" placeholder="請輸入密碼"></label>
+            <label class="check-option"><input type="checkbox" name="remember">記住我</label>
             <button class="primary-button wide" type="submit">登入系統 ${icon("arrow", 18)}</button>
           </form>
           <p class="helper">${activeRole === "admin" ? "使用維護人員專用帳號登入。" : "使用教師或管理員提供的帳號登入。公告儲存於雲端。"}</p>
@@ -227,7 +228,7 @@ function renderLogin() {
     const button = event.currentTarget.querySelector('[type="submit"]');
     button.disabled = true;
     try {
-      const profile = await cloud.login(data.get("account"), data.get("password"), activeRole);
+      const profile = await cloud.login(data.get("account"), data.get("password"), activeRole, data.has("remember"));
       if ((profile.role === "assistant" ? "teacher" : profile.role) !== activeRole) throw new Error("帳號不屬於此登入入口，請使用管理員提供的正確連結。");
       state.session = { ...profile, name: profile.display_name };
       state.schoolView = 'home';
