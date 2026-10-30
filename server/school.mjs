@@ -4,7 +4,6 @@ const fail=(status,message)=>{throw Object.assign(new Error(message),{status});}
 const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const text=(value,max=2000)=>{if(typeof value!=='string'||!value.trim()||value.trim().length>max)fail(400,`請填寫內容（最多 ${max} 字）`);return value.trim();};
 const date=value=>{if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)||!Number.isFinite(Date.parse(value+'T00:00:00Z'))||new Date(value+'T00:00:00Z').toISOString().slice(0,10)!==value)fail(400,'日期格式錯誤');return value;};
-const time=value=>{if(typeof value!=='string'||!Number.isFinite(Date.parse(value)))fail(400,'時間格式錯誤');return new Date(value).toISOString();};
 const staff=user=>['teacher','assistant','admin'].includes(user.role);
 const teacher=user=>['teacher','admin'].includes(user.role);
 const requireRole=(allowed)=>{if(!allowed)fail(403,'沒有使用此功能的權限');};
@@ -19,7 +18,7 @@ export async function migrateSchool(){await db.query(`
  create table if not exists school_homework(id uuid primary key,subject_id uuid not null references school_subjects(id),author_id uuid references accounts704(id) on delete set null,title text not null,work_day date not null,due_on date not null,recipients uuid[],created_at timestamptz not null default now());
  create table if not exists school_checks(homework_id uuid references school_homework(id) on delete cascade,student_id uuid references accounts704(id) on delete cascade,done boolean not null default false,updated_at timestamptz not null default now(),primary key(homework_id,student_id));
  create table if not exists school_records(id uuid primary key,kind text not null check(kind in ('missing','feedback')),student_id uuid not null references accounts704(id) on delete cascade,author_id uuid references accounts704(id) on delete set null,subject_id uuid references school_subjects(id),title text not null,content text not null default '',record_day date not null,due_on date,resolved boolean not null default false,created_at timestamptz not null default now());
- create table if not exists school_plans(id uuid primary key,owner_id uuid not null references accounts704(id) on delete cascade,title text not null,start_at timestamptz not null,end_at timestamptz not null,done boolean not null default false);
+ drop table if exists school_plans;
  create table if not exists school_chat_settings(id integer primary key check(id=1),enabled boolean not null default true);
  insert into school_chat_settings(id) values(1) on conflict do nothing;
  create table if not exists school_rooms(id uuid primary key,title text not null,kind text not null check(kind in ('direct','group')),creator_id uuid references accounts704(id) on delete set null,direct_key text unique,created_at timestamptz not null default now());
@@ -61,7 +60,6 @@ export async function migrateSchool(){await db.query(`
  drop trigger if exists school_notify_records on school_records;
  create trigger school_notify_records after insert on school_records for each row execute function school_notify_event();
  create index if not exists school_records_student on school_records(student_id,record_day);
- create index if not exists school_plans_owner on school_plans(owner_id,start_at);
  `);}
 export async function schoolRoutes({path,query,method,user,readBody,send}){
  const tail=path.slice('/school/'.length).split('/');const [resource,id,action]=tail;
@@ -136,11 +134,6 @@ export async function schoolRoutes({path,query,method,user,readBody,send}){
   if(method==='POST'){const b=await readBody();if(!['missing','feedback'].includes(b.kind))fail(400,'紀錄類型錯誤');const subject=b.subject_id||null;if(subject&&!uuid(subject))fail(400,'科目格式錯誤');const content=b.content==null?'':typeof b.content==='string'&&b.content.length<=5000?b.content:fail(400,'評語最多 5000 字');return send(201,await transaction(async c=>{const selected=await students(b.students,c),rows=[];for(const student of selected)rows.push((await c.query('insert into school_records(id,kind,student_id,author_id,subject_id,title,content,record_day,due_on) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *',[randomUUID(),b.kind,student,user.id,subject,text(b.title,200),content,date(b.record_day),b.due_on?date(b.due_on):null])).rows[0]);return rows;}));}
   if(uuid(id)&&method==='PATCH'){const b=await readBody();if(typeof b.resolved!=='boolean')fail(400,'請設定補交狀態');const row=await db.query('update school_records set resolved=$1 where id=$2 returning *',[b.resolved,id]);if(!row.rowCount)fail(404,'找不到紀錄');return send(200,row.rows[0]);}
   if(uuid(id)&&method==='DELETE'){await db.query('delete from school_records where id=$1',[id]);return send(200,{ok:true});}
- }
- if(resource==='plans'){
-  if(method==='GET')return send(200,(await db.query('select * from school_plans where owner_id=$1 order by start_at',[user.id])).rows);
-  if(method==='POST'||(method==='PATCH'&&uuid(id))){const b=await readBody(),start=time(b.start_at),end=time(b.end_at);if(end<start)fail(400,'結束時間不能早於開始時間');if(typeof b.done!=='boolean')fail(400,'請設定完成狀態');const row=method==='POST'?await db.query('insert into school_plans(id,owner_id,title,start_at,end_at,done) values($1,$2,$3,$4,$5,$6) returning *',[randomUUID(),user.id,text(b.title,200),start,end,b.done]):await db.query('update school_plans set title=$1,start_at=$2,end_at=$3,done=$4 where id=$5 and owner_id=$6 returning *',[text(b.title,200),start,end,b.done,id,user.id]);if(!row.rowCount)fail(404,'找不到你的事項');return send(method==='POST'?201:200,row.rows[0]);}
-  if(method==='DELETE'&&uuid(id)){const r=await db.query('delete from school_plans where id=$1 and owner_id=$2 returning id',[id,user.id]);if(!r.rowCount)fail(404,'找不到你的事項');return send(200,{ok:true});}
  }
  if(resource==='chat-settings'){
   if(method==='GET')return send(200,(await db.query('select enabled from school_chat_settings where id=1')).rows[0]);

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {db} from './db.mjs';
 import {hash} from './password.mjs';
-const prefix='school-check-'+randomUUID(),accounts=[],homework=[],records=[],plans=[],rooms=[],subjects=[],activities=[];
+const prefix='school-check-'+randomUUID(),accounts=[],homework=[],records=[],rooms=[],subjects=[],activities=[];
 let previousChat;
 async function request(path,method='GET',data,token){const r=await fetch('http://127.0.0.1:7040'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(data===undefined?{}:{body:JSON.stringify(data)})});return {status:r.status,value:await r.json()};}
 async function fixture(role,suffix=role){const id=randomUUID(),email=prefix+'-'+suffix;accounts.push(id);await db.query('insert into accounts704(id,email,display_name,role,password_hash) values($1,$2,$3,$4,$5)',[id,email,email,role,await hash('x')]);const r=await request('/login','POST',{email,password:'x',portal:role==='assistant'?'teacher':role});assert.equal(r.status,200);return {id,token:r.value.token};}
@@ -31,11 +31,6 @@ try{
  assert.ok((await call(a,'records')).value.some(r=>r.id===records[0]));assert.ok(!(await call(b,'records')).value.some(r=>records.includes(r.id)));
  assert.equal((await call(assistant,'records')).status,403);assert.equal((await call(a,'records/'+records[0],'PATCH',{resolved:true})).status,403);
  assert.equal((await call(teacher,'records/'+records[0],'PATCH',{resolved:true})).status,200);
- const planData={title:prefix,start_at:'2030-01-01T01:00:00Z',end_at:'2030-01-02T02:00:00Z',done:false};
- const p=await call(a,'plans','POST',planData);if(p.value.id)plans.push(p.value.id);assert.equal(p.status,201);
- assert.ok(!(await call(b,'plans')).value.some(x=>x.id===p.value.id));assert.equal((await call(b,'plans/'+p.value.id,'DELETE')).status,404);
- assert.equal((await call(a,'plans/'+p.value.id,'PATCH',{...planData,done:true})).status,200);
- assert.equal((await call(a,'plans','POST',{...planData,end_at:'2029-01-01T00:00:00Z'})).status,400);
  const activity=await request('/countdowns','POST',{title:prefix,target_at:'2030-01-01T00:00:00Z',ends_at:'2030-01-02T00:00:00Z'},teacher.token);if(activity.value.id)activities.push(activity.value.id);assert.equal(activity.status,200);assert.ok(activity.value.ends_at);
  assert.equal((await request('/countdowns','POST',{title:prefix,target_at:'2030-01-03T00:00:00Z',ends_at:'2030-01-02T00:00:00Z'},teacher.token)).status,400);
  await call(admin,'chat-settings','PATCH',{enabled:true});
@@ -64,13 +59,12 @@ try{
  assert.equal((await call(a,`rooms/${group.value.id}/messages`,'POST',{content:'blocked'})).status,403);
  assert.equal((await call(a,'rooms','POST',{kind:'group',title:prefix,members:[b.id]})).status,403);
  assert.equal((await call(teacher,'rooms')).status,403);
- console.log('PASS: subjects/admin boundaries, homework targeting and private completion, atomic batch rollback, private student records, personal calendar isolation, activity end times, direct/group membership, chat moderation and disable controls');
+ console.log('PASS: subjects/admin boundaries, homework targeting and private completion, atomic batch rollback, private student records, activity end times, direct/group membership, chat moderation and disable controls');
 }finally{
  if(typeof previousChat==='boolean')await db.query('update school_chat_settings set enabled=$1 where id=1',[previousChat]);
  await db.query('delete from school_rooms where id=any($1::uuid[])',[rooms]);
  await db.query('delete from school_records where id=any($1::uuid[])',[records]);
  await db.query('delete from school_homework where id=any($1::uuid[])',[homework]);
- await db.query('delete from school_plans where id=any($1::uuid[])',[plans]);
  await db.query('delete from countdowns704 where id=any($1::uuid[])',[activities]);
  await db.query('delete from school_subjects where id=any($1::uuid[])',[subjects]);
  await db.query('delete from accounts704 where id=any($1::uuid[])',[accounts]);
